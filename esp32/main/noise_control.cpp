@@ -43,6 +43,7 @@ extern "C" {
 #include "ota.h"
 #if CONFIG_IMPO_ENABLED
 extern "C" {
+#include "impo_commands.h"
 #include "impo_state.h"
 }
 #endif
@@ -1258,6 +1259,10 @@ static char *build_register_json(void) {
                 nullptr, nullptr);
     cJSON_AddNumberToObject(
         cJSON_GetObjectItem(commands, "device.discover"), "timeout_ms", 90000);
+#endif
+
+#if CONFIG_IMPO_ENABLED
+    impo_commands_describe(commands);
 #endif
 
 #if CONFIG_HOMEHUB_DISPLAY_COMMANDS

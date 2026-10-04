@@ -72,6 +72,7 @@
 #include "boards/watcher_camera.h"
 #endif
 #if CONFIG_IMPO_ENABLED
+#include "impo_commands.h"
 #include "impo_glue.h"
 // Impo joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
@@ -1837,6 +1838,10 @@ static cJSON *on_ws_command(
         if (!url) return command_error("missing_param", "url is required");
         return queue_ws_control(WS_CONTROL_SET_VM, url);
     }
+#if CONFIG_IMPO_ENABLED
+    cJSON *ui_result = impo_commands_run(command, params);
+    if (ui_result) return ui_result;
+#endif
 #if CONFIG_HOMEHUB_DISPLAY_COMMANDS
     if (strcmp(command, "display.draw_url") == 0) {
         cJSON *url = cJSON_GetObjectItem(params, "url");

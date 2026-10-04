@@ -24,6 +24,7 @@
 #include "esp_err.h"
 #include "lvgl.h"
 
+#include "impo_commands.h"
 #include "impo_state.h"
 
 #ifdef __cplusplus
@@ -97,6 +98,9 @@ typedef struct {
     esp_err_t (*read_power)(impo_power_t *out);
     /* Turns the board off; returns only on failure. */
     esp_err_t (*power_off)(void);
+    /* Commands only this board has (impo_commands.h); may be left out. */
+    const impo_command_t *commands;
+    int command_count;
 } impo_board_t;
 
 /* The running board, set by impo_app_run(). */

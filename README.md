@@ -32,6 +32,10 @@ limitations under the License.
 > - The ESP32 firmware verifies cross-signed certificate chains, which the
 >   Impo gateway's TLS certificate needs.
 > - It adds a board: the Espressif ESP-SparkBot.
+> - Boards with the full UI declare extra commands (`display.show_text`,
+>   `avatar.cheer`, `speaker.set_volume`, `speaker.beep`), and a board can add
+>   its own through `impo_board_t.commands`; see
+>   [`esp32/components/impo/impo_commands.h`](esp32/components/impo/impo_commands.h).
 >
 > See [gadgets.impo.ai](https://gadgets.impo.ai) for what the Impo gateway
 > supports today. Pairing from the Impo app is not available yet, and the Impo

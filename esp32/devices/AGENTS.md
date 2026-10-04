@@ -216,6 +216,7 @@ The fields of `impo_board_t`:
 | `wait_buttons` | While the display is paused: blocks until a button changes, so the chip light-sleeps instead of waking to poll. `impo_gpio_buttons_wait()` for GPIO buttons; a key only the PMU sees has to be polled. May be NULL: polled every 50 ms |
 | `read_power` | May be NULL (no battery). `impo_pmu_read_power` on an AXP2101. Leave `battery_mv` 0 if the board can't measure the voltage in millivolts. The battery meter (`impo_battery.h`: Settings → Battery, `tools/impo/power.py`) reads it |
 | `power_off` | Required. Returns only if it fails |
+| `commands`, `command_count` | Commands only this board has, declared to the account in `link.register` and run on `link.invoke` (`impo_commands.h`). May be left out. The description is what the agent reads, so say what the command does and what it cannot know; `run` must not block |
 
 On a classic ESP32 (see `board_m5stack_stickc_plus2.c`):
 

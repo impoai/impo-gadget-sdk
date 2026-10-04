@@ -20,11 +20,16 @@
  * Pins follow xiaozhi-esp32's board, main/boards/espressif/esp-sparkbot
  * (config.h and esp_sparkbot_board.cc). GPIO46 is both the backlight and the
  * amplifier enable, so it is only ever on or off, never dimmed, and the codec
- * is not given the pin. The camera, touch pads and battery are not used.
+ * is not given the pin. The optional tracked base listens on UART1 for the
+ * drive, dance and light commands its own firmware defines. The camera, touch
+ * pads and battery are not used.
  */
+#include <string.h>
+
 #include "driver/i2c_master.h"
 #include "driver/i2s_std.h"
 #include "driver/spi_master.h"
+#include "driver/uart.h"
 #include "esp_check.h"
 #include "esp_codec_dev_defaults.h"
 #include "esp_lcd_panel_io.h"
@@ -61,6 +66,10 @@ static const char *TAG = "board";
 
 #define TALK_GPIO GPIO_NUM_0        /* BOOT */
 
+#define BASE_UART UART_NUM_1         /* the tracked base, when one is attached */
+#define BASE_TX GPIO_NUM_38
+#define BASE_RX GPIO_NUM_48
+
 static i2c_master_bus_handle_t s_i2c;
 static esp_lcd_panel_handle_t s_panel;
 static impo_gpio_button_t s_talk;
@@ -76,6 +85,17 @@ static esp_err_t init(void)
         .flags.enable_internal_pullup = true,
     };
     ESP_RETURN_ON_ERROR(i2c_new_master_bus(&i2c_cfg, &s_i2c), TAG, "i2c");
+    const uart_config_t base_cfg = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    ESP_RETURN_ON_ERROR(uart_driver_install(BASE_UART, 2048, 0, 0, NULL, 0), TAG, "base uart");
+    ESP_RETURN_ON_ERROR(uart_param_config(BASE_UART, &base_cfg), TAG, "base uart config");
+    ESP_RETURN_ON_ERROR(uart_set_pin(BASE_UART, BASE_TX, BASE_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE), TAG, "base uart pins");
     return impo_gpio_button_init(&s_talk, TALK_GPIO);
 }
 
@@ -251,6 +271,60 @@ static esp_err_t power_off(void)
     return ESP_FAIL;
 }
 
+/*
+ * The tracked base takes short text commands; nothing comes back, so these
+ * report that the command was sent, not that the base moved. Strings follow
+ * xiaozhi-esp32's esp-sparkbot board.
+ */
+static cJSON *base_send(const char *text)
+{
+    uart_write_bytes(BASE_UART, text, strlen(text));
+    cJSON *result = impo_command_ok();
+    cJSON_AddStringToObject(result, "note", "sent to the base; the gadget cannot tell whether a base is attached");
+    return result;
+}
+
+static cJSON *chassis_move(const cJSON *params)
+{
+    static const struct {
+        const char *direction, *text;
+    } moves[] = { { "forward", "x0.0 y1.0" }, { "back", "x0.0 y-1.0" }, { "left", "x-1.0 y0.0" },
+                  { "right", "x1.0 y0.0" }, { "stop", "x0.0 y0.0" } };
+    const char *direction = cJSON_GetStringValue(cJSON_GetObjectItem(params, "direction"));
+    for (size_t i = 0; direction && i < sizeof(moves) / sizeof(moves[0]); i++) {
+        if (!strcmp(direction, moves[i].direction)) {
+            return base_send(moves[i].text);
+        }
+    }
+    return impo_command_error("invalid_param", "direction must be forward, back, left, right or stop");
+}
+
+static cJSON *chassis_dance(const cJSON *params)
+{
+    (void)params;
+    return base_send("d1");
+}
+
+static cJSON *chassis_light(const cJSON *params)
+{
+    const cJSON *mode = cJSON_GetObjectItem(params, "mode");
+    if (!cJSON_IsNumber(mode) || mode->valueint < 1 || mode->valueint > 6) {
+        return impo_command_error("invalid_param", "mode must be 1 to 6");
+    }
+    const char text[] = { 'w', (char)('0' + mode->valueint + 2), '\0' };
+    return base_send(text);
+}
+
+static const impo_command_t s_commands[] = {
+    { "chassis.move",
+      "Drive the SparkBot's tracked base, if one is attached: one step forward, back, left or right, or stop.",
+      "{\"direction\":{\"type\":\"string\",\"description\":\"forward, back, left, right or stop.\"}}", NULL, chassis_move },
+    { "chassis.dance", "Make the SparkBot's tracked base do its dance, if one is attached.", NULL, NULL, chassis_dance },
+    { "chassis.set_light",
+      "Choose the light effect on the SparkBot's tracked base, if one is attached.",
+      "{\"mode\":{\"type\":\"integer\",\"description\":\"1 to 6, the base's own effects.\"}}", NULL, chassis_light },
+};
+
 static const impo_board_t s_board = {
     .name = "ESP-SparkBot",
     .width = LCD_RES,
@@ -272,6 +346,8 @@ static const impo_board_t s_board = {
     .poll_buttons = poll_buttons,
     .wait_buttons = wait_buttons,
     .power_off = power_off,
+    .commands = s_commands,
+    .command_count = sizeof(s_commands) / sizeof(s_commands[0]),
 };
 
 /* Home Link's app_main starts Impo with this board (main/main.c). */
