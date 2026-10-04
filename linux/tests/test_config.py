@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from musegadget import config
+from impogadget import config
 
 TOKEN = "mgst_" + "A" * 42 + "w"
 

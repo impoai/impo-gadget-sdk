@@ -20,7 +20,7 @@
 #include <string.h>
 
 #include "esp_http_client.h"
-#include "muse_account_api.h"
+#include "impo_account_api.h"
 #include "vm_api.h"
 #include "vm_connect.h"
 
@@ -698,19 +698,19 @@ static void test_set_base_url_changes_fetch_target(void) {
         }
     }
 
-    // Muse voice boards have their own account client, with no base override.
+    // Impo voice boards have their own account client, with no base override.
     fake_reset();
     fake_queue_response(200, vm_body);
-    muse_hatch_vm_t vm = {0};
-    CHECK(muse_hatch_api_find_vm("access", "", &vm) == 0,
-          "Muse account lookup failed");
-    CHECK(g_request_count == 1, "Muse account request count=%d", g_request_count);
+    impo_hatch_vm_t vm = {0};
+    CHECK(impo_hatch_api_find_vm("access", "", &vm) == 0,
+          "Impo account lookup failed");
+    CHECK(g_request_count == 1, "Impo account request count=%d", g_request_count);
     expect_url(&g_requests[0], "/fetch_vms");
-    CHECK(g_requests[0].method == HTTP_METHOD_GET, "Muse account lookup should GET");
+    CHECK(g_requests[0].method == HTTP_METHOD_GET, "Impo account lookup should GET");
     CHECK(strcmp(g_requests[0].authorization, "Bearer access") == 0,
-          "Muse account authorization mismatch");
+          "Impo account authorization mismatch");
     CHECK(strcmp(vm.vm_id, "vm-one") == 0 && strcmp(vm.vm_token, "t") == 0,
-          "Muse account VM credential mismatch");
+          "Impo account VM credential mismatch");
     free(vm.vm_token);
 }
 

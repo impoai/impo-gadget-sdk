@@ -20,10 +20,10 @@ import time
 
 import pytest
 
-from musegadget.ble_framing import ChunkAssembler, encode_chunks
-from musegadget.ble_setup import ProvisionFailed, SetupController
-from musegadget.identity import Identity
-from musegadget.pairing import PairingState
+from impogadget.ble_framing import ChunkAssembler, encode_chunks
+from impogadget.ble_setup import ProvisionFailed, SetupController
+from impogadget.identity import Identity
+from impogadget.pairing import PairingState
 
 from test_pairing import APP, Mobile, client_finished_record, hello, make_device
 

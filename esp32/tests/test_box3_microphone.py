@@ -167,7 +167,7 @@ class Box3MicrophoneTests(unittest.TestCase):
             path.write_text('#include "fake.h"\n')
         (tmp / "test.c").write_text(HARNESS)
         cls.exe = tmp / "test"
-        board = ROOT / "components/muse/boards"
+        board = ROOT / "components/impo/boards"
         subprocess.run(shlex.split(os.environ.get("CC", "cc")) + [
             "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(tmp), "-I", str(board),
             str(board / "box_3_microphone.c"), str(tmp / "test.c"), "-o", str(cls.exe)

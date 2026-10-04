@@ -31,8 +31,8 @@
 #include "lvgl.h"
 #include "src/drivers/sdl/lv_sdl_window.h"
 
-#include "muse_state.h"
-#include "muse_ui.h"
+#include "impo_state.h"
+#include "impo_ui.h"
 #include "sim_board.h"
 #include "sim_platform.h"
 #include "sim_services.h"
@@ -43,15 +43,15 @@ static volatile sig_atomic_t s_quit;
 static bool s_ready;
 static float s_level;
 static float s_progress;
-static muse_power_t s_power = {
+static impo_power_t s_power = {
     .battery_pct = 72,
     .battery_mv = 3970,
     .charging = false,
     .usb = true,
 };
-static muse_ble_state_t s_ble_state = MUSE_BLE_CONNECTED;
+static impo_ble_state_t s_ble_state = IMPO_BLE_CONNECTED;
 static uint32_t s_passkey;
-static char s_ble_name[32] = "MuseGadget-SIM001";
+static char s_ble_name[32] = "ImpoGadget-SIM001";
 
 static void usage(FILE *out, const char *argv0)
 {
@@ -71,7 +71,7 @@ static void usage(FILE *out, const char *argv0)
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
-            "P writes muse-simulator.ppm, Esc quits. Mouse input is touch.\n",
+            "P writes impo-simulator.ppm, Esc quits. Mouse input is touch.\n",
             argv0);
 }
 
@@ -184,33 +184,33 @@ static bool parse_float(const char *text, float min, float max, float *out)
     return true;
 }
 
-static void select_mode(muse_mode_t mode)
+static void select_mode(impo_mode_t mode)
 {
     /* Production shutdown permits only Idle next. Preview controls should
      * still be able to select any state after showing Off. */
-    if (muse_state_mode(NULL) == MUSE_MODE_OFF && mode != MUSE_MODE_OFF) {
-        muse_state_set_mode(MUSE_MODE_IDLE);
+    if (impo_state_mode(NULL) == IMPO_MODE_OFF && mode != IMPO_MODE_OFF) {
+        impo_state_set_mode(IMPO_MODE_IDLE);
     }
-    muse_state_set_mode(mode);
+    impo_state_set_mode(mode);
 }
 
 static bool set_face(const char *value)
 {
     static const struct {
         const char *name;
-        muse_mode_t mode;
+        impo_mode_t mode;
     } modes[] = {
-        { "boot", MUSE_MODE_BOOT },
-        { "idle", MUSE_MODE_IDLE },
-        { "listening", MUSE_MODE_LISTENING },
-        { "thinking", MUSE_MODE_THINKING },
-        { "speaking", MUSE_MODE_SPEAKING },
-        { "error", MUSE_MODE_ERROR },
-        { "off", MUSE_MODE_OFF },
+        { "boot", IMPO_MODE_BOOT },
+        { "idle", IMPO_MODE_IDLE },
+        { "listening", IMPO_MODE_LISTENING },
+        { "thinking", IMPO_MODE_THINKING },
+        { "speaking", IMPO_MODE_SPEAKING },
+        { "error", IMPO_MODE_ERROR },
+        { "off", IMPO_MODE_OFF },
     };
     if (!strcmp(value, "happy")) {
-        select_mode(MUSE_MODE_IDLE);
-        muse_state_make_happy();
+        select_mode(IMPO_MODE_IDLE);
+        impo_state_make_happy();
         return true;
     }
     for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); i++) {
@@ -226,19 +226,19 @@ static bool set_wifi(const char *value)
 {
     static const struct {
         const char *name;
-        muse_wifi_state_t state;
+        impo_wifi_state_t state;
     } states[] = {
-        { "off", MUSE_WIFI_OFF },
-        { "no_network", MUSE_WIFI_NO_NETWORK },
-        { "connecting", MUSE_WIFI_CONNECTING },
-        { "connected", MUSE_WIFI_CONNECTED },
-        { "failed", MUSE_WIFI_FAILED },
-        { "not_nearby", MUSE_WIFI_NOT_NEARBY },
+        { "off", IMPO_WIFI_OFF },
+        { "no_network", IMPO_WIFI_NO_NETWORK },
+        { "connecting", IMPO_WIFI_CONNECTING },
+        { "connected", IMPO_WIFI_CONNECTED },
+        { "failed", IMPO_WIFI_FAILED },
+        { "not_nearby", IMPO_WIFI_NOT_NEARBY },
     };
     for (size_t i = 0; i < sizeof(states) / sizeof(states[0]); i++) {
         if (!strcmp(value, states[i].name)) {
             sim_services_set_wifi(states[i].state,
-                                  states[i].state == MUSE_WIFI_CONNECTED ? "Muse Simulator" : "");
+                                  states[i].state == IMPO_WIFI_CONNECTED ? "Impo Simulator" : "");
             return true;
         }
     }
@@ -249,11 +249,11 @@ static bool set_ble(const char *value)
 {
     static const struct {
         const char *name;
-        muse_ble_state_t state;
+        impo_ble_state_t state;
     } states[] = {
-        { "off", MUSE_BLE_OFF },
-        { "advertising", MUSE_BLE_ADVERTISING },
-        { "connected", MUSE_BLE_CONNECTED },
+        { "off", IMPO_BLE_OFF },
+        { "advertising", IMPO_BLE_ADVERTISING },
+        { "connected", IMPO_BLE_CONNECTED },
     };
     for (size_t i = 0; i < sizeof(states) / sizeof(states[0]); i++) {
         if (!strcmp(value, states[i].name)) {
@@ -269,16 +269,16 @@ static bool set_link(const char *value)
 {
     static const struct {
         const char *name;
-        muse_link_state_t state;
+        impo_link_state_t state;
     } states[] = {
-        { "boot", MUSE_LINK_BOOT },
-        { "unpaired", MUSE_LINK_UNPAIRED },
-        { "pairing", MUSE_LINK_PAIRING },
-        { "confirm", MUSE_LINK_CONFIRM },
-        { "connecting", MUSE_LINK_CONNECTING },
-        { "online", MUSE_LINK_ONLINE },
-        { "offline", MUSE_LINK_OFFLINE },
-        { "error", MUSE_LINK_ERROR },
+        { "boot", IMPO_LINK_BOOT },
+        { "unpaired", IMPO_LINK_UNPAIRED },
+        { "pairing", IMPO_LINK_PAIRING },
+        { "confirm", IMPO_LINK_CONFIRM },
+        { "connecting", IMPO_LINK_CONNECTING },
+        { "online", IMPO_LINK_ONLINE },
+        { "offline", IMPO_LINK_OFFLINE },
+        { "error", IMPO_LINK_ERROR },
     };
     for (size_t i = 0; i < sizeof(states) / sizeof(states[0]); i++) {
         if (!strcmp(value, states[i].name)) {
@@ -298,41 +298,41 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
         return set_face(value);
     }
     if (!strcmp(key, "caption")) {
-        muse_state_set_caption("%s", value);
+        impo_state_set_caption("%s", value);
         return true;
     }
     if (!strcmp(key, "level") && parse_float(value, 0.0f, 1.0f, &scalar)) {
         s_level = scalar;
-        muse_state_set_level(s_level);
+        impo_state_set_level(s_level);
         return true;
     }
     if (!strcmp(key, "progress") && parse_float(value, 0.0f, 1.0f, &scalar)) {
         s_progress = scalar;
-        muse_state_set_progress(s_progress);
+        impo_state_set_progress(s_progress);
         return true;
     }
     if (!strcmp(key, "battery") && parse_long(value, -1, 100, &number)) {
         s_power.battery_pct = (int)number;
-        muse_state_set_power(&s_power);
+        impo_state_set_power(&s_power);
         return true;
     }
     if (!strcmp(key, "battery_mv") && parse_long(value, 0, 6000, &number)) {
         s_power.battery_mv = (int)number;
-        muse_state_set_power(&s_power);
+        impo_state_set_power(&s_power);
         return true;
     }
     if (!strcmp(key, "usb") && parse_bool(value, &flag)) {
         s_power.usb = flag;
-        muse_state_set_power(&s_power);
+        impo_state_set_power(&s_power);
         return true;
     }
     if (!strcmp(key, "charging") && parse_bool(value, &flag)) {
         s_power.charging = flag;
-        muse_state_set_power(&s_power);
+        impo_state_set_power(&s_power);
         return true;
     }
     if (!strcmp(key, "asleep") && parse_bool(value, &flag)) {
-        muse_state_set_asleep(flag);
+        impo_state_set_asleep(flag);
         return true;
     }
     if (!strcmp(key, "wifi")) {
@@ -437,32 +437,32 @@ static int event_watch(void *userdata, SDL_Event *event)
     if (down && key == SDLK_ESCAPE) {
         s_quit = 1;
     } else if (down && key >= SDLK_F1 && key <= SDLK_F7) {
-        static const muse_mode_t modes[] = {
-            MUSE_MODE_BOOT, MUSE_MODE_IDLE, MUSE_MODE_LISTENING, MUSE_MODE_THINKING,
-            MUSE_MODE_SPEAKING, MUSE_MODE_ERROR, MUSE_MODE_OFF,
+        static const impo_mode_t modes[] = {
+            IMPO_MODE_BOOT, IMPO_MODE_IDLE, IMPO_MODE_LISTENING, IMPO_MODE_THINKING,
+            IMPO_MODE_SPEAKING, IMPO_MODE_ERROR, IMPO_MODE_OFF,
         };
         select_mode(modes[key - SDLK_F1]);
     } else if (down && key == SDLK_h) {
-        select_mode(MUSE_MODE_IDLE);
-        muse_state_make_happy();
+        select_mode(IMPO_MODE_IDLE);
+        impo_state_make_happy();
     } else if (key == SDLK_SPACE) {
-        select_mode(down ? MUSE_MODE_LISTENING : MUSE_MODE_THINKING);
+        select_mode(down ? IMPO_MODE_LISTENING : IMPO_MODE_THINKING);
     } else if (down && (key == SDLK_PLUS || key == SDLK_EQUALS || key == SDLK_KP_PLUS)) {
         s_level = s_level < 0.9f ? s_level + 0.1f : 1.0f;
-        muse_state_set_level(s_level);
+        impo_state_set_level(s_level);
     } else if (down && (key == SDLK_MINUS || key == SDLK_KP_MINUS)) {
         s_level = s_level > 0.1f ? s_level - 0.1f : 0.0f;
-        muse_state_set_level(s_level);
+        impo_state_set_level(s_level);
     } else if (down && key == SDLK_RIGHTBRACKET) {
         s_progress = s_progress < 0.9f ? s_progress + 0.1f : 1.0f;
-        muse_state_set_progress(s_progress);
+        impo_state_set_progress(s_progress);
     } else if (down && key == SDLK_LEFTBRACKET) {
         s_progress = s_progress > 0.1f ? s_progress - 0.1f : 0.0f;
-        muse_state_set_progress(s_progress);
+        impo_state_set_progress(s_progress);
     } else if (down && key == SDLK_s) {
-        muse_state_set_asleep(!muse_state_asleep());
+        impo_state_set_asleep(!impo_state_asleep());
     } else if (down && key == SDLK_p) {
-        (void)write_snapshot("muse-simulator.ppm");
+        (void)write_snapshot("impo-simulator.ppm");
     }
     return 1;
 }
@@ -507,14 +507,14 @@ int main(int argc, char **argv)
     sim_time_reset();
     sim_services_reset();
     lv_init();
-    muse_state_init();
-    muse_state_set_power(&s_power);
-    muse_board = sim_board_get();
-    if (muse_board->init && muse_board->init() != ESP_OK) {
+    impo_state_init();
+    impo_state_set_power(&s_power);
+    impo_board = sim_board_get();
+    if (impo_board->init && impo_board->init() != ESP_OK) {
         fprintf(stderr, "simulator board initialization failed\n");
         return 1;
     }
-    if (muse_ui_start() != ESP_OK) {
+    if (impo_ui_start() != ESP_OK) {
         fprintf(stderr, "UI initialization failed\n");
         return 1;
     }

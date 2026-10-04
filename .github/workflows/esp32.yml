@@ -84,8 +84,8 @@ jobs:
         run: |
           cmake -S esp32/simulator -B build/simulator -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DMUSE_SIM_SANITIZERS=${{ matrix.sanitizers }} \
-            -DMUSE_SIM_WARNINGS_AS_ERRORS=ON
+            -DIMPO_SIM_SANITIZERS=${{ matrix.sanitizers }} \
+            -DIMPO_SIM_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build/simulator --parallel
@@ -116,39 +116,42 @@ jobs:
           - board: home-assistant-voice
             target: esp32s3
             overlays: ";devices/sdkconfig.home-assistant-voice"
-          - board: muse-waveshare-s3-175c
+          - board: impo-waveshare-s3-175c
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c"
-          - board: muse-waveshare-s3-175
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-175c"
+          - board: impo-waveshare-s3-175
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175"
-          - board: muse-aipi
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-175"
+          - board: impo-espressif-sparkbot
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-aipi"
-          - board: muse-waveshare-c6-18
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-espressif-sparkbot"
+          - board: impo-aipi
+            target: esp32s3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-aipi"
+          - board: impo-waveshare-c6-18
             target: esp32c6
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-c6-18"
-          - board: muse-sensecap-watcher
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-c6-18"
+          - board: impo-sensecap-watcher
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-sensecap-watcher"
-          - board: muse-m5stack-cardputer-adv
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-sensecap-watcher"
+          - board: impo-m5stack-cardputer-adv
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-cardputer-adv"
-          - board: muse-espressif-box-3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-cardputer-adv"
+          - board: impo-espressif-box-3
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-espressif-box-3"
-          - board: muse-m5stack-sticks3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-espressif-box-3"
+          - board: impo-m5stack-sticks3
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-sticks3"
-          - board: muse-m5stack-stopwatch
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-sticks3"
+          - board: impo-m5stack-stopwatch
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-stopwatch"
-          - board: muse-m5stack-cores3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-stopwatch"
+          - board: impo-m5stack-cores3
             target: esp32s3
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-cores3"
-          - board: muse-m5stack-stickc-plus2
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-cores3"
+          - board: impo-m5stack-stickc-plus2
             target: esp32
-            overlays: ";devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-stickc-plus2"
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-stickc-plus2"
     defaults:
       run:
         shell: bash

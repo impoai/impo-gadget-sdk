@@ -21,10 +21,10 @@ How to build this firmware and flash it onto your own ESP32 board. See
 
 ## What this is
 
-The ESP32 Device SDK: the ESP-IDF firmware (`muse-gadget`) powering Muse
+The ESP32 Device SDK: the ESP-IDF firmware (`impo-gadget`) powering Impo
 Home Link. It pairs with a phone over BLE, joins Wi-Fi, and holds an encrypted
 Noise session to a VM, with an optional home-network tunnel. `main/main.c` is the entry
-point and `main/app.c` holds most of the logic. `components/muse` adds a
+point and `main/app.c` holds most of the logic. `components/impo` adds a
 avatar/voice/settings UI on boards with a display.
 
 ## Prerequisites
@@ -51,17 +51,18 @@ before adding a feature to one.
 | Seeed reTerminal E1001 | `esp32s3` | `devices/sdkconfig.reterminal-e1001` | `tools/board.sh reterminal-e1001` |
 | Seeed reTerminal E1002 | `esp32s3` | `devices/sdkconfig.reterminal-e1002` | `tools/board.sh reterminal-e1002` |
 | Home Assistant Voice Preview Edition | `esp32s3` | `devices/sdkconfig.home-assistant-voice` | `tools/board.sh home-assistant-voice` |
-| Waveshare ESP32-S3-Touch-AMOLED-1.75C | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c` | manual (below) |
-| Waveshare ESP32-S3-Touch-AMOLED-1.75 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175` | manual (below) |
-| Espressif ESP32-S3-BOX-3 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-espressif-box-3` | `tools/muse/board.sh build box3` |
-| AIPI Lite | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-aipi` | manual |
-| Waveshare ESP32-C6-Touch-AMOLED-1.8 | `esp32c6` | `devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-c6-18` | manual |
-| Seeed SenseCAP Watcher | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-sensecap-watcher` | manual |
-| M5Stack Cardputer ADV (experimental) | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-cardputer-adv` | `tools/muse/board.sh build cardputer-adv` |
-| M5Stack StickS3 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-sticks3` | manual |
-| M5Stack StopWatch | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-stopwatch` | manual |
-| M5Stack CoreS3 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-cores3` | `tools/muse/board.sh build cores3` |
-| M5Stack StickC Plus2 | `esp32` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-stickc-plus2` | manual |
+| Waveshare ESP32-S3-Touch-AMOLED-1.75C | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-175c` | manual (below) |
+| Waveshare ESP32-S3-Touch-AMOLED-1.75 | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-175` | manual (below) |
+| Espressif ESP32-S3-BOX-3 | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-espressif-box-3` | `tools/impo/board.sh build box3` |
+| AIPI Lite | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-aipi` | manual |
+| Espressif ESP-SparkBot | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-espressif-sparkbot` | `tools/impo/board.sh build sparkbot` |
+| Waveshare ESP32-C6-Touch-AMOLED-1.8 | `esp32c6` | `devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-c6-18` | manual |
+| Seeed SenseCAP Watcher | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-sensecap-watcher` | manual |
+| M5Stack Cardputer ADV (experimental) | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-cardputer-adv` | `tools/impo/board.sh build cardputer-adv` |
+| M5Stack StickS3 | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-sticks3` | manual |
+| M5Stack StopWatch | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-stopwatch` | manual |
+| M5Stack CoreS3 | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-cores3` | `tools/impo/board.sh build cores3` |
+| M5Stack StickC Plus2 | `esp32` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-stickc-plus2` | manual |
 
 The default profile expects the C5 DevKitC-1: an addressable status LED on
 GPIO27, the BOOT button on GPIO28 (active low), 8 MB flash and quad PSRAM.
@@ -72,16 +73,16 @@ like most WS2812s: turn the option off in `idf.py menuconfig`, or in
 
 ## Build
 
-Every build needs the user's SDK token (`mgst_…`, from gadgets.muse.ai >
+Every build needs the user's SDK token (`mgst_…`, from gadgets.impo.ai >
 Account > SDK tokens). Ask for it, then set `CONFIG_GADGET_SDK_TOKEN="mgst_…"`
 in that build directory's `sdkconfig` (or with `idf.py menuconfig`) before
 building. Without it the build warns, and the gadget will stop pairing once
-Muse requires tokens. Never commit the token or print it in full.
+Impo requires tokens. Never commit the token or print it in full.
 
 ### DevKitC-1 (default)
 
 ```sh
-idf.py build                    # -> build/muse-gadget.bin, config in build/sdkconfig
+idf.py build                    # -> build/impo-gadget.bin, config in build/sdkconfig
 ```
 
 ### Other boards, with the helper
@@ -103,9 +104,9 @@ from `$IDF_PATH`, `~/esp/esp-idf-v6.0.1`, `~/esp/esp-idf-v6` or `~/esp/esp-idf`.
 
 `tools/board.sh home-assistant-voice build` builds a status-and-voice gadget:
 the LED ring shows the status colours, holding the centre button records a
-voice note that Muse answers in the app, and the dial sets the speaker volume
+voice note that Impo answers in the app, and the dial sets the speaker volume
 (shown on the ring, kept across restarts). It advertises as
-`MuseGadget-ha-voice-XXXXXX`.
+`ImpoGadget-ha-voice-XXXXXX`.
 
 - The console and flashing go through the S3's own USB-Serial-JTAG, which
   shows up as `/dev/cu.usbmodem*` like a DevKitC-1. With both plugged in, pass
@@ -118,41 +119,41 @@ voice note that Muse answers in the app, and the dial sets the speaker volume
 
 ### Boards with the full UI, by hand
 
-`tools/muse/board.sh build|flash <s3|s3n|aipi|box3|c6|watcher|sticks3|plus2|cardputer-adv|stopwatch|cores3> [SERIAL|PORT]`
-builds one board in `build-muse-<profile>/`, logs to
-`/tmp/muse_build_<board>.log`, and clears `managed_components/` before and
+`tools/impo/board.sh build|flash <s3|s3n|aipi|sparkbot|box3|c6|watcher|sticks3|plus2|cardputer-adv|stopwatch|cores3> [SERIAL|PORT]`
+builds one board in `build-impo-<profile>/`, logs to
+`/tmp/impo_build_<board>.log`, and clears `managed_components/` before and
 after so it doesn't clash with other boards. When flashing, it finds the
-board's port with `tools/muse/ports.py`, by the USB device behind it rather
+board's port with `tools/impo/ports.py`, by the USB device behind it rather
 than the port name, which changes when boards are re-cabled. With several
 boards of one kind attached, pass the device's USB serial number (on the chip's
-own USB serial port, its MAC) or the port; `tools/muse/ports.py --list` shows
+own USB serial port, its MAC) or the port; `tools/impo/ports.py --list` shows
 them. It finds ESP-IDF the way `tools/board.sh` does, trying
 `~/.espressif/esp-idf-v6.0.1` first. For an install anywhere else, set
 `IDF_EXPORT` to its `export.sh`, e.g. in your shell profile:
-`export IDF_EXPORT=/path/to/esp-idf/export.sh`. `tools/muse/avatar.py` builds
+`export IDF_EXPORT=/path/to/esp-idf/export.sh`. `tools/impo/avatar.py` builds
 through `board.sh`, so it needs the same.
 
-For bench testing, `MUSE_BENCH=1 tools/muse/board.sh build|flash ...` adds
-`devices/sdkconfig.muse-bench` and uses `build-muse-<profile>-bench/`. That
-turns on screenshots: `tools/muse/snap.py PORT KEYS OUT.png` sends bench keys
+For bench testing, `IMPO_BENCH=1 tools/impo/board.sh build|flash ...` adds
+`devices/sdkconfig.impo-bench` and uses `build-impo-<profile>-bench/`. That
+turns on screenshots: `tools/impo/snap.py PORT KEYS OUT.png` sends bench keys
 and saves the screen, and `>face=thinking` (or `idle`, `listening`,
 `speaking`, `error`, `boot`, `off`, `happy`) in KEYS picks the avatar mode first.
 Screenshots are off in normal builds because each one takes a buffer the size
 of the screen. `>face=` works in any build. Or run `idf.py` directly:
 
 ```sh
-idf.py -B build-muse-aipi -DIDF_TARGET=esp32s3 \
-  -DSDKCONFIG=build-muse-aipi/sdkconfig \
-  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-aipi" build
+idf.py -B build-impo-aipi -DIDF_TARGET=esp32s3 \
+  -DSDKCONFIG=build-impo-aipi/sdkconfig \
+  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.impo;devices/sdkconfig.impo-aipi" build
 ```
 
 To flash, add `-p PORT flash` with the same `-B`, target and defaults
 arguments, except on the SenseCAP Watcher: `idf.py flash` runs plain esptool,
 which fails on its USB bridge (see "Flash it"). Build the Watcher with
-`idf.py`, flash it with `tools/muse/board.sh flash watcher`, then
-`idf.py … -p PORT monitor` as usual; reading from the bridge works. Muse builds use `partitions_muse.csv` and need 16 MB of flash or
+`idf.py`, flash it with `tools/impo/board.sh flash watcher`, then
+`idf.py … -p PORT monitor` as usual; reading from the bridge works. Impo builds use `partitions_impo.csv` and need 16 MB of flash or
 more, except the StickS3, StickC Plus2 and Cardputer ADV, which have 8 MB and use
-`partitions_muse_8mb.csv`.
+`partitions_impo_8mb.csv`.
 
 All boards share `managed_components/` and `dependencies.lock` in this
 directory. If the component manager fails after you switch between a board
@@ -184,12 +185,12 @@ flash size and status backend.
    itself, and this needs no guessing:
 
    ```sh
-   python3 tools/muse/chat.py --status     # {"board": "M5Stack StickS3", ...}
+   python3 tools/impo/chat.py --status     # {"board": "M5Stack StickS3", ...}
    ```
 
-   It also logs the name once at startup, as `muse: board: <name>`, which
-   `tools/muse/monitor.py PORT` captures because it resets the board first.
-   `components/muse/muse_app.c` logs it; each `components/muse/boards/board_*.c`
+   It also logs the name once at startup, as `impo: board: <name>`, which
+   `tools/impo/monitor.py PORT` captures because it resets the board first.
+   `components/impo/impo_app.c` logs it; each `components/impo/boards/board_*.c`
    sets its `.name`. Boards with the full UI only: the other overlays don't log a name.
 
 2. **Read the USB descriptor.** This works with no write access to the port and
@@ -215,7 +216,7 @@ flash size and status backend.
 
 4. **Fall back to a read-only capture.** If the board is mid-run and you can't
    write to the port, the `## Monitor` recipe below reads it without resetting,
-   and a talk press logs the board's own button name as `muse_input: waking
+   and a talk press logs the board's own button name as `impo_input: waking
    (<hint>)`:
 
    | Hint | Board |
@@ -247,12 +248,12 @@ add yourself to the `dialout` (or `uucp`) group. If the chip won't enter the
 bootloader, hold BOOT, tap RESET, release BOOT, and flash again.
 
 The M5Stack StickC Plus2's CH9102 bridge shows up as `/dev/cu.usbserial-*` or
-`/dev/ttyACM*`. It drops out above 230400 baud, so `tools/muse/board.sh`
+`/dev/ttyACM*`. It drops out above 230400 baud, so `tools/impo/board.sh`
 flashes it at 230400.
 
 The SenseCAP Watcher's bottom USB-C port has a CH342 bridge with two ports,
 both `/dev/cu.usbmodem*` on macOS. The ESP32-S3 console is the second (ending
-in `3`); the first is the Himax camera chip. Muse overwrites the Watcher's
+in `3`); the first is the Himax camera chip. Impo overwrites the Watcher's
 factory data, so back up its `nvsfactory` partition first (see
 `devices/README.md`).
 
@@ -262,8 +263,8 @@ packet at once, at any baud and on any USB port. Plain esptool then fails with
 uploading its stub, or `0105: The format of the received message is invalid`
 on the first flash block, by which point it has erased the bootloader. That
 leaves the Watcher unable to boot until a flash succeeds; the ROM loader still
-answers, so it isn't bricked. `tools/muse/board.sh flash watcher` goes through
-`tools/muse/paced_esptool.py`, which takes esptool's arguments and sends 64
+answers, so it isn't bricked. `tools/impo/board.sh flash watcher` goes through
+`tools/impo/paced_esptool.py`, which takes esptool's arguments and sends 64
 bytes at a time at the line rate, at 115200 baud. Use it in place of
 `python -m esptool` for anything that writes to the Watcher. A lower baud or
 another USB port doesn't help. Pacing works with macOS's built-in driver, so
@@ -275,8 +276,8 @@ unbootable again. To watch the progress, run the wrapper from the build
 directory:
 
 ```sh
-cd build-muse-sensecap-watcher
-python ../tools/muse/paced_esptool.py --chip esp32s3 -p PORT -b 115200 \
+cd build-impo-sensecap-watcher
+python ../tools/impo/paced_esptool.py --chip esp32s3 -p PORT -b 115200 \
   --before default-reset --after hard-reset write-flash "@flash_args"
 ```
 
@@ -312,44 +313,44 @@ while time.monotonic() < deadline:
         time.sleep(0.05)
 ```
 
-To capture from boot, use `tools/muse/monitor.py PORT [secs]`, which resets the
+To capture from boot, use `tools/impo/monitor.py PORT [secs]`, which resets the
 board first (it needs `pyserial`). A healthy boot logs
-`link.main: Muse Gadget starting`. For a board with the full UI, `$(tools/muse/ports.py BOARD)`
-gives the port, with BOARD as in `tools/muse/board.sh`.
+`link.main: Impo Gadget starting`. For a board with the full UI, `$(tools/impo/ports.py BOARD)`
+gives the port, with BOARD as in `tools/impo/board.sh`.
 
 ## Update my avatar
 
 When someone asks to put their own avatar on their board (or to update or
 change it), run this from `esp32/` with the sandbox off (it uses the serial
-port) and let it finish. It takes several minutes, mostly waiting for Muse:
+port) and let it finish. It takes several minutes, mostly waiting for Impo:
 
 ```sh
-python3 tools/muse/avatar.py                    # draw their avatar
-python3 tools/muse/avatar.py --edit "CHANGE"    # change the one they have
+python3 tools/impo/avatar.py                    # draw their avatar
+python3 tools/impo/avatar.py --edit "CHANGE"    # change the one they have
 ```
 
-It checks the board, asks their Muse for the renderer through the board,
-saves it to `components/muse/avatar/muse_pixel.c` (gitignored), checks it on
+It checks the board, asks their Impo for the renderer through the board,
+saves it to `components/impo/avatar/impo_pixel.c` (gitignored), checks it on
 the host, then builds and flashes. Progress and errors go to stderr. Relay the
-line that starts with `Muse drew:` and the GIF paths. On failure, pass the
+line that starts with `Impo drew:` and the GIF paths. On failure, pass the
 message on. The exit status says what kind of failure it was:
 
 - **2**: no board, or it can't do this. If it says the board doesn't answer,
   rerun with `--board s3` or `--board aipi` (from the board's name, or ask) to
   flash firmware that can. On the C6 or Watcher, follow the manual steps in
-  `tools/muse/AVATAR_RECIPE.md`.
-- **3**: the board isn't on Wi-Fi, or it isn't paired in the Muse app and has
-  no device token, so their Muse isn't connected. Tell them, and point them to
-  the Muse app or `tools/muse/ble_setup.html`.
-- **1**: Muse's file still fails after two fix rounds, or the build or flash
-  failed. The previous avatar is in `muse_pixel.c.prev`, next to the new one.
+  `tools/impo/AVATAR_RECIPE.md`.
+- **3**: the board isn't on Wi-Fi, or it isn't paired in the Impo app and has
+  no device token, so their Impo isn't connected. Tell them, and point them to
+  the Impo app or `tools/impo/ble_setup.html`.
+- **1**: Impo's file still fails after two fix rounds, or the build or flash
+  failed. The previous avatar is in `impo_pixel.c.prev`, next to the new one.
 
-Don't commit anything in `components/muse/avatar/`. To see what the board
-says, run `python3 tools/muse/chat.py --status`. To ask their Muse something,
-run `python3 tools/muse/chat.py "question"`.
+Don't commit anything in `components/impo/avatar/`. To see what the board
+says, run `python3 tools/impo/chat.py --status`. To ask their Impo something,
+run `python3 tools/impo/chat.py "question"`.
 
-The default avatar is in `avatar/`: its renderer (`muse_pixel.c`) and
-its animation (`jollybot.gif`, and `happy_anim.c/.h` made from it by
+The default avatar is in `avatar/`: its renderer (`impo_pixel.c`) and
+its animation (`robin.gif`, and `happy_anim.c/.h` made from it by
 `tools/gen_happy_anim.py`).
 
 Third-party code keeps its upstream license and header: `minimp3.h` (CC0) and
@@ -357,8 +358,9 @@ Third-party code keeps its upstream license and header: `minimp3.h` (CC0) and
 their headers with the Apache one; `components/minimp3/README.md` says how to
 update minimp3.
 
-The Apache License doesn't cover the Jollybot avatar in `avatar/`. Its files
-carry only a Meta copyright line; don't add the Apache header to them.
+The default avatar, Robin, is original to this fork and Apache-licensed. To
+rebuild `robin.gif`, render the "happy" animation with `tools/impo/anim.c` and
+save its 75 frames as a 40 ms GIF.
 
 ## First boot and pairing
 
@@ -380,19 +382,19 @@ Button (BOOT on the dev boards):
   setup isn't complete
 - **hold for 5 s**: reset setup (unpair and forget Wi-Fi)
 
-The device advertises as `MuseGadget-XXXXXX` (`MuseGadget-Disp-XXXXXX` on the
-ideaspark, SenseCAP Indicator and reTerminal E1001 and E1002 overlays, `MuseGadget-ha-voice-XXXXXX` on the
+The device advertises as `ImpoGadget-XXXXXX` (`ImpoGadget-Disp-XXXXXX` on the
+ideaspark, SenseCAP Indicator and reTerminal E1001 and E1002 overlays, `ImpoGadget-ha-voice-XXXXXX` on the
 Voice PE). It uses **community pairing v5**, so the phone app must support v5
 and list community devices. Community pairing needs the button press but has no
 manufacturer attestation, and it doesn't stop an active man-in-the-middle.
 
 Until it's paired, a board with the full UI shows that name on its screen, dim under the
-state, so you can tell which gadget to pick in the Muse app. A screen too narrow
+state, so you can tell which gadget to pick in the Impo app. A screen too narrow
 for the whole name shows the `XXXXXX` tail on its own, and a square 128 px
 screen (AIPI Lite) leaves it out, the same as it leaves out the state. Once it's
 paired (or has a token set by hand), the name goes, and the mic icon and the
 touch boards' speaker button appear. They're hidden until then, since a press
-can't reach Muse and there are no replies to mute.
+can't reach Impo and there are no replies to mute.
 
 To skip BLE Wi-Fi provisioning while you iterate, set
 `CONFIG_HOMEHUB_WIFI_SSID` and `CONFIG_HOMEHUB_WIFI_PASSWORD` in `menuconfig`.
@@ -414,26 +416,26 @@ The device still needs to be paired once for its token.
 - Don't move offsets in `partitions.csv`. `prod_data` and `prod_bak` are fixed
   manufacturing locations, and the table offset of `0x10000` leaves room for a
   larger Secure Boot bootloader. Check the `check_sizes` line in the build
-  output: app slots are 2 MB (4 MB on Muse).
+  output: app slots are 2 MB (4 MB on Impo).
 
-## Say Muse, never Hatch
+## Say Impo, never Hatch
 
 Users never see the name Hatch.
 
-- Anything a person reads says Muse, the Muse app, or the Muse's name:
-  - screen text and error captions (`CAN'T REACH MUSE`, not `CAN'T REACH HATCH`)
+- Anything a person reads says Impo, the Impo app, or the Impo's name:
+  - screen text and error captions (`CAN'T REACH IMPO`, not `CAN'T REACH HATCH`)
   - settings labels
   - Kconfig prompts and help
   - log lines
   - tool and script output
   - docs
-- Don't use `hatch` in a new file name or identifier. Use `muse` or
-  `muse_gadget`. The Muse chat code is `components/muse/muse_chat*`.
+- Don't use `hatch` in a new file name or identifier. Use `impo` or
+  `impo_gadget`. The Impo chat code is `components/impo/impo_chat*`.
 - The ESP32 account clients use `https://gadgets.impo.ai`, or the `api_url_v2`
   base the app sends during pairing, with bare API paths. They ignore
   `api_url`: only older firmware reads it, and that firmware adds `/hatch/`
   itself. Keep saving it so a device flashed back to older firmware still works.
-- `hatch` stays only where the server or the Muse app depends on it. Don't
+- `hatch` stays only where the server or the Impo app depends on it. Don't
   rename these:
   - the VM host `gadgets.impo.ai`
   - the `hatch_refresh:` auth prefix, the `hatch-web` app id and the
@@ -443,8 +445,8 @@ Users never see the name Hatch.
   - the bug report fields
   - the setup commands (`hatch.token` and the rest) and the `"hatch"` key
     in the status JSON, which the app and older tools use
-- Some older identifiers still carry the name (`muse_hatch_*`,
-  `MUSE_HATCH_*`, `CONFIG_MUSE_HATCH`). Leave them unless you're asked to
+- Some older identifiers still carry the name (`impo_hatch_*`,
+  `IMPO_HATCH_*`, `CONFIG_IMPO_HATCH`). Leave them unless you're asked to
   rename them. Don't copy the name into new code.
 
 ## Tests

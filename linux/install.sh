@@ -19,20 +19,20 @@
 #   bash install.sh [--from SOURCE] [--run-as USER] [--sdk-token TOKEN] [--yes] [--no-pair]
 #   bash install.sh --uninstall [--purge]
 #
-# Installs system packages, a pinned uv, and musegadget into /opt/musegadget;
+# Installs system packages, a pinned uv, and impogadget into /opt/impogadget;
 # sets BlueZ's GATT MTU for the Android app; installs and starts the
-# musegadget service; then opens Bluetooth pairing for the Muse app.
+# impogadget service; then opens Bluetooth pairing for the Impo app.
 
 set -euo pipefail
 
 UV_VERSION="0.9.9"
-PREFIX="/opt/musegadget"
+PREFIX="/opt/impogadget"
 VENV="$PREFIX/venv"
-UNIT="/etc/systemd/system/musegadget.service"
-STATE_DIR="/var/lib/musegadget"
+UNIT="/etc/systemd/system/impogadget.service"
+STATE_DIR="/var/lib/impogadget"
 BLUEZ_CONF="/etc/bluetooth/main.conf"
-BLUEZ_DROPIN="/etc/systemd/system/bluetooth.service.d/zz-musegadget.conf"
-DEFAULT_SOURCE="git+https://github.com/facebookincubator/muse-gadget-sdk@main#subdirectory=linux"
+BLUEZ_DROPIN="/etc/systemd/system/bluetooth.service.d/zz-impogadget.conf"
+DEFAULT_SOURCE="git+https://github.com/impoai/impo-gadget-sdk@main#subdirectory=linux"
 APT_PACKAGES=(bluez python3 python3-dbus python3-gi python3-cryptography curl ca-certificates)
 
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
@@ -43,16 +43,16 @@ usage() {
     cat <<EOF
 Usage: install.sh [options]
 
-  --from SOURCE     Install musegadget from SOURCE: a local linux/ checkout, a
+  --from SOURCE     Install impogadget from SOURCE: a local linux/ checkout, a
                     wheel, or a pip/uv URL. Default: $DEFAULT_SOURCE
-  --run-as USER     Account whose permissions your Muse's commands run with.
+  --run-as USER     Account whose permissions your Impo's commands run with.
                     Default: the account running this installer.
-  --sdk-token TOKEN Your mgst_ SDK token from gadgets.muse.ai. Every gadget
+  --sdk-token TOKEN Your mgst_ SDK token from gadgets.impo.ai. Every gadget
                     needs one to pair. Saved, readable only by root, in
                     $STATE_DIR/sdk_token.
   --yes             Don't ask for confirmation.
   --no-pair         Install without opening Bluetooth pairing.
-  --uninstall       Remove musegadget. Keeps the device identity and pairing
+  --uninstall       Remove impogadget. Keeps the device identity and pairing
                     in $STATE_DIR unless --purge is also given.
   -h, --help        Show this help.
 EOF
@@ -102,7 +102,7 @@ check_system() {
         warn "systemd is not running; the service will be installed but not started."
     fi
     if [ -z "$(ls /sys/class/bluetooth 2>/dev/null)" ]; then
-        warn "no Bluetooth adapter found. You can install, but pairing with the Muse app needs Bluetooth LE."
+        warn "no Bluetooth adapter found. You can install, but pairing with the Impo app needs Bluetooth LE."
     fi
 }
 
@@ -111,15 +111,15 @@ choose_account() {
         if [ "$(id -u)" -ne 0 ]; then RUN_AS="$(id -un)"; else RUN_AS="${SUDO_USER:-}"; fi
     fi
     if [ -z "$RUN_AS" ] || [ "$RUN_AS" = root ]; then
-        die "choose the account your Muse's commands run as with --run-as USER (running them as root is not supported)."
+        die "choose the account your Impo's commands run as with --run-as USER (running them as root is not supported)."
     fi
     id "$RUN_AS" >/dev/null 2>&1 || die "account '$RUN_AS' does not exist."
 
     local admin=""
     if as_root sudo -n -l -U "$RUN_AS" 2>/dev/null | grep -qE '\(ALL( : ALL)?\) (NOPASSWD: )?ALL'; then
-        admin=" This account has administrator (sudo) rights, so your Muse will be able to do anything on this machine, including reading the device's own credentials."
+        admin=" This account has administrator (sudo) rights, so your Impo will be able to do anything on this machine, including reading the device's own credentials."
     fi
-    say "Your Muse will be able to run any command on this machine as '$RUN_AS', with that account's permissions.$admin"
+    say "Your Impo will be able to run any command on this machine as '$RUN_AS', with that account's permissions.$admin"
     ask "Continue?" || die "cancelled. Rerun with --run-as to choose a different account."
 }
 
@@ -147,7 +147,7 @@ install_uv() {
         as_root env UV_INSTALL_DIR="$PREFIX/bin" UV_NO_MODIFY_PATH=1 sh -s -- --quiet
 }
 
-install_musegadget() {
+install_impogadget() {
     local uv="$PREFIX/bin/uv"
     # The system interpreter is required: dbus and gi come from apt and are
     # built for it.
@@ -155,18 +155,18 @@ install_musegadget() {
         say "Creating $VENV"
         as_root "$uv" venv --quiet --python /usr/bin/python3 --system-site-packages "$VENV"
     fi
-    say "Installing musegadget from $SOURCE"
+    say "Installing impogadget from $SOURCE"
     as_root "$uv" pip install --quiet --python "$VENV/bin/python" --no-deps --reinstall "$SOURCE"
     local data
-    data="$("$VENV/bin/python" -c 'import musegadget, os; print(os.path.join(os.path.dirname(musegadget.__file__), "data"))')"
+    data="$("$VENV/bin/python" -c 'import impogadget, os; print(os.path.join(os.path.dirname(impogadget.__file__), "data"))')"
     as_root "$uv" pip install --quiet --python "$VENV/bin/python" --require-hashes \
         -r "$data/requirements.lock"
-    as_root ln -sf "$VENV/bin/musegadget" /usr/local/bin/musegadget
+    as_root ln -sf "$VENV/bin/impogadget" /usr/local/bin/impogadget
     DATA_DIR="$data"
 }
 
 configure_bluez() {
-    # The Muse Android app writes (MTU - 3)-byte packets and fails above 512,
+    # The Impo Android app writes (MTU - 3)-byte packets and fails above 512,
     # so keep the negotiated MTU at 256, as the ESP32 firmware does.
     local result
     result="$(as_root python3 - "$BLUEZ_CONF" <<'EOF'
@@ -190,7 +190,7 @@ else:
     text = text.rstrip("\n") + ("\n\n" if text else "") + "[GATT]\n" + line + "\n"
 if text != "":
     try:
-        shutil.copy2(path, path + ".pre-musegadget")
+        shutil.copy2(path, path + ".pre-impogadget")
     except FileNotFoundError:
         pass
 open(path, "w").write(text)
@@ -198,7 +198,7 @@ print("changed")
 EOF
 )"
     if [ "$result" = changed ]; then
-        say "Set BlueZ ExchangeMTU = 256 (backup: $BLUEZ_CONF.pre-musegadget)"
+        say "Set BlueZ ExchangeMTU = 256 (backup: $BLUEZ_CONF.pre-impogadget)"
         if systemd_running; then as_root systemctl restart bluetooth; fi
     fi
     disable_bluez_battery
@@ -237,7 +237,7 @@ else:
     args.append("--noplugin=battery")
 os.makedirs(os.path.dirname(path), exist_ok=True)
 with open(path, "w") as f:
-    f.write("# Written by the musegadget installer: never ask phones to bond.\n"
+    f.write("# Written by the impogadget installer: never ask phones to bond.\n"
             "[Service]\nExecStart=\nExecStart=" + " ".join(args) + "\n")
 print("changed")
 EOF
@@ -255,7 +255,7 @@ EOF
 save_sdk_token() {
     if [ -z "$SDK_TOKEN" ]; then
         if ! as_root test -s "$STATE_DIR/sdk_token"; then
-            say "No SDK token yet. Get one at gadgets.muse.ai and rerun with --sdk-token; gadgets without one will stop pairing."
+            say "No SDK token yet. Get one at gadgets.impo.ai and rerun with --sdk-token; gadgets without one will stop pairing."
         fi
         return 0
     fi
@@ -265,42 +265,42 @@ save_sdk_token() {
 }
 
 install_service() {
-    say "Installing the musegadget service"
-    sed "s/@RUN_AS@/$RUN_AS/" "$DATA_DIR/musegadget.service" | as_root tee "$UNIT" >/dev/null
+    say "Installing the impogadget service"
+    sed "s/@RUN_AS@/$RUN_AS/" "$DATA_DIR/impogadget.service" | as_root tee "$UNIT" >/dev/null
     if systemd_running; then
         as_root systemctl daemon-reload
-        as_root systemctl enable --now musegadget.service >/dev/null 2>&1
-        as_root systemctl restart musegadget.service
+        as_root systemctl enable --now impogadget.service >/dev/null 2>&1
+        as_root systemctl restart impogadget.service
     fi
 }
 
 pair() {
     if as_root test -s "$STATE_DIR/pairing.json"; then
-        say "Already paired; the service will reconnect to your Muse."
+        say "Already paired; the service will reconnect to your Impo."
         return
     fi
     if [ "$NO_PAIR" = 1 ]; then
-        say "Skipping pairing. Run 'sudo musegadget pair' when you're ready."
+        say "Skipping pairing. Run 'sudo impogadget pair' when you're ready."
         return
     fi
     cat <<EOF
 
-Pair with your Muse:
-  1. In the Muse app, turn on Settings > Devices > Developer mode.
+Pair with your Impo:
+  1. In the Impo app, turn on Settings > Devices > Developer mode.
   2. Add a device and choose the device named below.
   3. When asked for Wi-Fi, pick the network shown; no password is needed.
 
 EOF
-    as_root /usr/local/bin/musegadget pair || warn "not paired. Run 'sudo musegadget pair' to try again."
+    as_root /usr/local/bin/impogadget pair || warn "not paired. Run 'sudo impogadget pair' to try again."
 }
 
 summary() {
     echo
-    as_root /usr/local/bin/musegadget info
+    as_root /usr/local/bin/impogadget info
     cat <<EOF
 
-Service:   sudo systemctl status musegadget
-Logs:      sudo journalctl -u musegadget -f
+Service:   sudo systemctl status impogadget
+Logs:      sudo journalctl -u impogadget -f
 Remove:    bash install.sh --uninstall
 EOF
 }
@@ -308,16 +308,16 @@ EOF
 # --- Uninstall ---------------------------------------------------------------
 
 uninstall() {
-    say "Removing musegadget"
+    say "Removing impogadget"
     if systemd_running && [ -f "$UNIT" ]; then
-        as_root systemctl disable --now musegadget.service >/dev/null 2>&1 || true
+        as_root systemctl disable --now impogadget.service >/dev/null 2>&1 || true
     fi
-    as_root rm -f "$UNIT" /usr/local/bin/musegadget
+    as_root rm -f "$UNIT" /usr/local/bin/impogadget
     if systemd_running; then as_root systemctl daemon-reload; fi
     as_root rm -rf "$PREFIX"
     if [ "$PURGE" = 1 ]; then
         as_root rm -rf "$STATE_DIR"
-        say "Removed the device identity and pairing too. Remove the device in the Muse app as well."
+        say "Removed the device identity and pairing too. Remove the device in the Impo app as well."
     else
         say "Kept the device identity and pairing in $STATE_DIR (use --purge to remove them)."
     fi
@@ -329,8 +329,8 @@ uninstall() {
         fi
         say "Turned BlueZ's battery plugin back on."
     fi
-    if [ -f "$BLUEZ_CONF.pre-musegadget" ]; then
-        say "BlueZ settings were left as they are; the original is at $BLUEZ_CONF.pre-musegadget."
+    if [ -f "$BLUEZ_CONF.pre-impogadget" ]; then
+        say "BlueZ settings were left as they are; the original is at $BLUEZ_CONF.pre-impogadget."
     fi
 }
 
@@ -355,7 +355,7 @@ main() {
     fi
     if [ "$UNINSTALL" = 1 ]; then uninstall; return; fi
     if [ -n "$SDK_TOKEN" ] && ! [[ "$SDK_TOKEN" =~ ^mgst_[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$ ]]; then
-        die "that SDK token is not valid; copy it again from gadgets.muse.ai."
+        die "that SDK token is not valid; copy it again from gadgets.impo.ai."
     fi
     if [ -d "$SOURCE" ]; then SOURCE="$(cd "$SOURCE" && pwd)"; fi
 
@@ -363,7 +363,7 @@ main() {
     choose_account
     install_packages
     install_uv
-    install_musegadget
+    install_impogadget
     configure_bluez
     save_sdk_token
     install_service

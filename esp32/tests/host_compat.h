@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef MUSE_TEST_HOST_COMPAT_H
-#define MUSE_TEST_HOST_COMPAT_H
+#ifndef IMPO_TEST_HOST_COMPAT_H
+#define IMPO_TEST_HOST_COMPAT_H
 
 #include <stddef.h>
 #include <string.h>
 
 /* ESP-IDF provides these, but some host C libraries do not. */
 #ifndef strlcpy
-static inline size_t muse_test_strlcpy(char *dst, const char *src, size_t cap)
+static inline size_t impo_test_strlcpy(char *dst, const char *src, size_t cap)
 {
     size_t len = strlen(src);
     if (cap) {
@@ -33,11 +33,11 @@ static inline size_t muse_test_strlcpy(char *dst, const char *src, size_t cap)
     return len;
 }
 
-#define strlcpy muse_test_strlcpy
+#define strlcpy impo_test_strlcpy
 #endif
 
 #ifndef strlcat
-static inline size_t muse_test_strlcat(char *dst, const char *src, size_t cap)
+static inline size_t impo_test_strlcat(char *dst, const char *src, size_t cap)
 {
     size_t dst_len = 0;
     while (dst_len < cap && dst[dst_len]) {
@@ -56,7 +56,7 @@ static inline size_t muse_test_strlcat(char *dst, const char *src, size_t cap)
     return dst_len + src_len;
 }
 
-#define strlcat muse_test_strlcat
+#define strlcat impo_test_strlcat
 #endif
 
 #endif

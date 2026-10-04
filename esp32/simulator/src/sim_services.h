@@ -19,10 +19,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "muse_ble.h"
-#include "muse_chat.h"
-#include "muse_link.h"
-#include "muse_wifi.h"
+#include "impo_ble.h"
+#include "impo_chat.h"
+#include "impo_link.h"
+#include "impo_wifi.h"
 
 /*
  * In-memory services used by the desktop UI preview. Setters are intended to
@@ -30,10 +30,10 @@
  */
 void sim_services_reset(void);
 
-void sim_services_set_wifi(muse_wifi_state_t state, const char *ssid);
-void sim_services_set_ble(muse_ble_state_t state, const char *name, uint32_t passkey);
+void sim_services_set_wifi(impo_wifi_state_t state, const char *ssid);
+void sim_services_set_ble(impo_ble_state_t state, const char *name, uint32_t passkey);
 void sim_services_set_paired(bool paired);
-void sim_services_set_chat_status(muse_hatch_state_t state, const char *detail);
-void sim_services_set_link_state(muse_link_state_t state);
+void sim_services_set_chat_status(impo_hatch_state_t state, const char *detail);
+void sim_services_set_link_state(impo_link_state_t state);
 void sim_services_set_brightness(int pct);
 void sim_services_set_speaker(bool on);

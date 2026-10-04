@@ -31,11 +31,11 @@
 extern "C" {
 #endif
 
-size_t muse_sim_strlcpy(char *destination, const char *source, size_t size);
+size_t impo_sim_strlcpy(char *destination, const char *source, size_t size);
 
 #ifdef __cplusplus
 }
 #endif
 
-#define strlcpy muse_sim_strlcpy
+#define strlcpy impo_sim_strlcpy
 #endif

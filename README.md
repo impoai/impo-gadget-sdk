@@ -14,30 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Muse Gadgets
+# Impo Gadgets
 
-> **Impo fork.** This is [Impo](https://impo.ai)'s fork of
-> [facebookincubator/muse-gadget-sdk](https://github.com/facebookincubator/muse-gadget-sdk).
-> The only change is the default server: gadgets built from this fork connect
-> to `https://gadgets.impo.ai` instead of `https://api.muse.ai` and
-> `hatch.metaaivm.com`. The protocol, firmware and SDK code are otherwise
-> upstream, and a gadget still follows `api_url_v2` and `noise_host` when
-> setup provides them. See [gadgets.impo.ai](https://gadgets.impo.ai) for what
-> the Impo gateway supports today; pairing from the Impo app is not available
-> yet, and an SDK token is not required by the Impo gateway. Muse is a
-> trademark of Meta Platforms, Inc.; Impo is not affiliated with or endorsed
-> by Meta. The rest of this document is upstream's.
+> **Impo fork.** This is [Impo](https://impo.ai)'s fork of Meta's
+> [facebookincubator/muse-gadget-sdk](https://github.com/facebookincubator/muse-gadget-sdk),
+> the open-source Muse Gadgets SDK. It differs from upstream in these ways:
+>
+> - Gadgets connect to `https://gadgets.impo.ai` by default, instead of
+>   `https://api.muse.ai` and `hatch.metaaivm.com`. A gadget still follows
+>   `api_url_v2` and `noise_host` when setup provides them.
+> - Every "Muse" name in the code, files and documentation is now "Impo",
+>   including the BLE name prefix (`ImpoGadget`), the Linux package and
+>   command (`impogadget`) and the ESP32 component (`components/impo`). The
+>   wire protocol is unchanged. "Impo Home Link" in the firmware and skills
+>   refers to the same reference design upstream calls Muse Home Link.
+> - The default avatar is Robin, an original Apache-licensed character.
+> - The ESP32 firmware verifies cross-signed certificate chains, which the
+>   Impo gateway's TLS certificate needs.
+> - It adds a board: the Espressif ESP-SparkBot.
+>
+> See [gadgets.impo.ai](https://gadgets.impo.ai) for what the Impo gateway
+> supports today. Pairing from the Impo app is not available yet, and the Impo
+> gateway neither issues nor requires SDK tokens, so skip the token steps and
+> ignore the token warnings. Muse is a trademark of Meta Platforms, Inc.; Impo
+> is not affiliated with or endorsed by Meta.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/images/muse-gadgets-dark.png">
-    <img src=".github/images/muse-gadgets-light.png" width="900" alt="Muse gadgets: a Waveshare round AMOLED, an M5Stack StickS3, Muse Home Link, a Raspberry Pi and a Seeed reTerminal e-ink display">
-  </picture>
-</p>
-
-Muse gadgets are open source devices you build yourself. Program an
+Impo gadgets are open source devices you build yourself. Program an
 off-the-shelf ESP32 board or set up a Raspberry Pi with our device SDKs, then
-connect Muse to your displays, buttons, sensors, actuators, and whatever else
+connect Impo to your displays, buttons, sensors, actuators, and whatever else
 you've got lying on your workbench.
 
 We open sourced the SDKs and firmware here. It's built by hackers, for hackers,
@@ -46,29 +50,24 @@ warranties, brownouts, or bankruptcies. Proceed at your own risk!
 
 | | |
 |---|---|
-| [**ESP32 Device SDK**](esp32) | Connect your ESP32 board to Muse through our open source SDK. Throw in a screen to show images, add audio in and out, or wire up other sensors. |
-| [**Linux Device SDK**](linux) | Turn that spare Raspberry Pi or Linux box into a Muse gadget. Hack in your own commands to let Muse handle sysadmin chores or your Home Assistant setup. |
+| [**ESP32 Device SDK**](esp32) | Connect your ESP32 board to Impo through our open source SDK. Throw in a screen to show images, add audio in and out, or wire up other sensors. |
+| [**Linux Device SDK**](linux) | Turn that spare Raspberry Pi or Linux box into a Impo gadget. Hack in your own commands to let Impo handle sysadmin chores or your Home Assistant setup. |
 
-Before you flash or pair a gadget, get an
-[SDK token](https://gadgets.muse.ai/settings/sdk-tokens) and review the
-[Gadget SDK Terms](https://gadgets.muse.ai/sdk-terms). Every gadget needs a
-token to pair.
-
-ESP32 and Linux gadgets pair with the Muse app on iOS and Android, via
+ESP32 and Linux gadgets pair with the Impo app on iOS and Android, via
 Settings > Devices. Turn on Developer mode there first, then look for devices
-prefixed with "MuseGadget".
+prefixed with "ImpoGadget".
 Each directory has a `README.md` to get started and an `AGENTS.md` for coding
 agents like [Muse Code](https://developer.meta.com/ai/lp/muse-code/).
 
 ## Community
 
-Meet other hackers who are building and customizing Muse gadgets in our
-community [Discord](https://discord.gg/3bhjCkZdd6). Get inspired, support each
+Meet other hackers who are building and customizing Impo gadgets in our
+community [Discord](https://discord.gg/84ZYn3xcGV). Get inspired, support each
 other, and share what you make.
 
 ## License
 
-Muse Gadgets is licensed under the Apache License, Version 2.0, found in
+Impo Gadgets is licensed under the Apache License, Version 2.0, found in
 [`LICENSE`](LICENSE), except for these third-party files, which keep their
 upstream licenses:
 
@@ -81,4 +80,4 @@ Dependencies fetched at build time are under their own licenses: ESP-IDF
 components (into `esp32/managed_components/`), and the simulator's LVGL and
 SDL (listed in [`esp32/simulator/THIRD_PARTY.md`](esp32/simulator/THIRD_PARTY.md)).
 
-The Apache License does not cover the [Jollybot avatar](esp32/avatar).
+The default avatar, Robin, in [`esp32/avatar`](esp32/avatar) is original to this fork and is covered by the Apache License.

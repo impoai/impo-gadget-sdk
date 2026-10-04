@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Default target: ESP32-C5 (RISC-V, Wi-Fi 6), the chip in Muse Home Link.
+# Default target: ESP32-C5 (RISC-V, Wi-Fi 6), the chip in Impo Home Link.
 # Board overlays in devices/ select other targets.
 CONFIG_IDF_TARGET="esp32c5"
 CONFIG_ESP32C5_REV_MAX_FULL=199
@@ -43,7 +43,7 @@ CONFIG_CJSON_NESTING_LIMIT=16
 # cache misses go straight to SPI flash, so bus width and clock matter.
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
-# Flash: 8 MB (Muse Home Link default). Works unchanged on 16 MB boards
+# Flash: 8 MB (Impo Home Link default). Works unchanged on 16 MB boards
 # (upper 8 MB unused).
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
@@ -116,6 +116,11 @@ CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
 # TLS: root CA bundle for HTTPS / WSS / OTA.
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
+# gadgets.impo.ai is served with a chain that ends in GTS Root R4 cross-signed
+# by GlobalSign Root CA, which the bundle no longer carries. This lets the
+# bundled GTS Root R4 anchor the chain; without it every TLS connection to the
+# gateway fails with "No matching trusted root certificate found".
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY=y
 
 # TLS record sizes. Outbound was 4 KB but each TLS record carries
 # encrypt/MAC/header overhead — 16 KB records cut that overhead 4x.

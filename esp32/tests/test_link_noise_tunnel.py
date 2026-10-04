@@ -161,7 +161,7 @@ class LinkNoiseTunnelTest(unittest.TestCase):
                     script.write_text(
                         f"set(CONFIG_LWIP_TCP_SND_BUF_DEFAULT {snd})\n"
                         f"set(CONFIG_LWIP_TCP_WND_DEFAULT {wnd})\n"
-                        f"set(CONFIG_MUSE_BOARD_M5STACK_CARDPUTER_ADV {'ON' if cardputer else 'OFF'})\n"
+                        f"set(CONFIG_IMPO_BOARD_M5STACK_CARDPUTER_ADV {'ON' if cardputer else 'OFF'})\n"
                         f"set(CONFIG_HOMEHUB_TUNNEL {'ON' if tunnel else 'OFF'})\n"
                         f"set(CONFIG_SPIRAM {'ON' if psram else 'OFF'})\n" + guard
                     )

@@ -19,7 +19,7 @@ build/
 # Claude Code
 .claude/
 # Interactive simulator screenshot.
-muse-simulator.ppm
+impo-simulator.ppm
 
 # Local gadget provisioning and original-device flash backups.
 .sdk-token

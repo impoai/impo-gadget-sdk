@@ -18,8 +18,8 @@
 
 #include <string_view>
 
-namespace musegadgets::noise::core {
+namespace impogadgets::noise::core {
 
 using StringView = std::string_view;
 
-} // namespace musegadgets::noise::core
+} // namespace impogadgets::noise::core

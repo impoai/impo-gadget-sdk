@@ -17,11 +17,11 @@ limitations under the License.
 # ESP32 Device SDK
 
 Flash this open source firmware onto any ESP32-compatible board to connect
-Muse to your home Wi-Fi. On boards with the home-network tunnel, Muse can reach
+Impo to your home Wi-Fi. On boards with the home-network tunnel, Impo can reach
 the devices you already own and anything you build with a local HTTP API.
 
 Then hack on it: add a display, a button, or support for a board we haven't
-tried yet, and build your own Muse gadget.
+tried yet, and build your own Impo gadget.
 
 > **Note:** Built by hackers, for hackers, just for fun. Flashing custom
 > firmware can brick boards and void warranties. Proceed at your own risk!
@@ -33,11 +33,7 @@ tried yet, and build your own Muse gadget.
   that already work are listed [below](#boards).
 - **A USB cable that carries data**, not just power.
 - **A computer** running macOS or Linux.
-- **An SDK token** from [gadgets.muse.ai](https://gadgets.muse.ai/settings/sdk-tokens)
-  (Account > SDK tokens). Every gadget needs one to pair, including ones you
-  build for yourself. Read the [Gadget SDK Terms](https://gadgets.muse.ai/sdk-terms)
-  before you use it.
-- **The Muse app** on your phone, to set up the device once it's flashed.
+- **The Impo app** on your phone, to set up the device once it's flashed.
 
 ## Get going with Muse Code
 
@@ -51,8 +47,8 @@ curl -fsSL https://dev.meta.ai/install.sh | sh
 Then plug in your board, and start Muse Code from this directory:
 
 ```sh
-git clone https://github.com/facebookincubator/muse-gadget-sdk
-cd muse-gadget-sdk/esp32
+git clone https://github.com/impoai/impo-gadget-sdk
+cd impo-gadget-sdk/esp32
 muse --disable-sandbox
 ```
 
@@ -105,12 +101,12 @@ Run the last line in every new terminal you build from.
 From this directory, set your SDK token, then build:
 
 ```sh
-idf.py menuconfig   # ESP32 Device SDK > Muse Gadgets SDK token
+idf.py menuconfig   # ESP32 Device SDK > Impo Gadgets SDK token
 idf.py build
 ```
 
 This builds for the ESP32-C5 DevKitC-1. The firmware lands in
-`build/muse-gadget.bin`.
+`build/impo-gadget.bin`.
 
 ### 3. Flash
 
@@ -128,20 +124,20 @@ connect, hold **BOOT**, tap **RESET**, release **BOOT**, and try again.
 Reflashing keeps your pairing and Wi-Fi settings. To start completely fresh,
 run `idf.py -p PORT erase-flash` first.
 
-### 4. Set it up with Muse
+### 4. Set it up with Impo
 
 Once flashed, the status light breathes **orange**: the device is ready for
-setup. In the Muse app, turn on **Settings > Devices > Developer mode**, then
+setup. In the Impo app, turn on **Settings > Devices > Developer mode**, then
 add the device (**Settings > Devices > Add Device**, the **+** icon in the top
-right). It shows up as `MuseGadget-XXXXXX`. When the light breathes **blue**, press the **BOOT**
-button to confirm it's really you. The light turns **green** when Muse is
+right). It shows up as `ImpoGadget-XXXXXX`. When the light breathes **blue**, press the **BOOT**
+button to confirm it's really you. The light turns **green** when Impo is
 connected.
 
 | Light | What it means |
 |---|---|
 | Orange, breathing | Ready for setup |
 | Blue, breathing | Press the button to confirm pairing |
-| Blue | Joining Wi-Fi and connecting to Muse |
+| Blue | Joining Wi-Fi and connecting to Impo |
 | Green | Connected |
 | Yellow, blinking | Reconnecting |
 | Purple | Not paired |
@@ -173,9 +169,10 @@ status screen.
 | Waveshare ESP32-S3-Touch-AMOLED-1.75 | UI, push-to-talk, settings, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
 | Espressif ESP32-S3-BOX-3 | UI, touch, push-to-talk, settings, images | [BOX-3 setup](devices/esp32-s3-box-3.md) |
 | AIPI Lite | UI, push-to-talk, two-button menu, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
+| Espressif ESP-SparkBot | UI, push-to-talk with the BOOT button, images. The backlight is on or off only, and the camera, touch pads and battery are not used | `tools/impo/board.sh build sparkbot` |
 | Waveshare ESP32-C6-Touch-AMOLED-1.8 | UI, push-to-talk with text replies | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
 | Seeed SenseCAP Watcher | UI, push-to-talk, settings, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
-| M5Stack Cardputer ADV (experimental) | UI, GO/Space push-to-talk with text replies, Esc/Enter/arrow menu controls | `tools/muse/board.sh build cardputer-adv` |
+| M5Stack Cardputer ADV (experimental) | UI, GO/Space push-to-talk with text replies, Esc/Enter/arrow menu controls | `tools/impo/board.sh build cardputer-adv` |
 | M5Stack StickS3 | UI, push-to-talk, two-button menu, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
 | M5Stack StopWatch | UI, push-to-talk, settings, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
 | M5Stack CoreS3 | UI, touch, PWR push-to-talk, settings, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
@@ -186,11 +183,11 @@ buy one.
 
 `tools/board.sh BOARD [build|flash|monitor|flash-monitor] [PORT]` builds each
 board in its own `build-<board>` directory with the right chip and settings.
-Boards that support images can show pictures Muse sends them:
+Boards that support images can show pictures Impo sends them:
 `tools/image_for_display.py` prepares a picture for the screen size.
 
 Boards without PSRAM, like the classic ESP32 and the ESP32-C6, run without the
-home-network tunnel, which needs more memory than they have. Muse can still
+home-network tunnel, which needs more memory than they have. Impo can still
 reach the device and control it.
 
 ## Hack and extend it
@@ -202,9 +199,9 @@ the chip, button pin, status light, and flash size.
 Muse Code to do it for you.
 
 To put your own avatar on a board's screen, plug in the board and run
-`python3 tools/muse/avatar.py`. It asks your Muse to redraw its avatar as the
+`python3 tools/impo/avatar.py`. It asks your Impo to redraw its avatar as the
 board's pixel avatar, checks the result, then builds and flashes it. Your avatar
-stays out of git. See [`tools/muse/AVATAR_RECIPE.md`](tools/muse/AVATAR_RECIPE.md)
+stays out of git. See [`tools/impo/AVATAR_RECIPE.md`](tools/impo/AVATAR_RECIPE.md)
 for how it works and for boards that need the manual steps.
 
 To work on the UI without a board, use the
@@ -212,23 +209,23 @@ To work on the UI without a board, use the
 and avatar renderer in a 412 x 412 SenseCAP Watcher window, supports mouse and
 keyboard input, and can render scripted screenshots without a display server.
 
-Replies from Muse are text: push-to-talk sends your voice note, Muse
+Replies from Impo are text: push-to-talk sends your voice note, Impo
 transcribes it and answers in writing, and boards with a screen show the
-answer as captions (the Voice PE's replies show up in the Muse app). Two
+answer as captions (the Voice PE's replies show up in the Impo app). Two
 things you can change:
 
 - **Shorter answers.** Ask for them in the message itself, such as "Answer in
   one sentence."
 - **Spoken answers.** Send each reply's text to a text-to-speech API of your
   choice and play the audio it returns. On boards with PSRAM, `start_tts` in
-  [`components/muse/muse_chat_session.cpp`](components/muse/muse_chat_session.cpp)
+  [`components/impo/impo_chat_session.cpp`](components/impo/impo_chat_session.cpp)
   is the spot: it has the reply text, and the MP3 decoder, speaker and volume
   are already wired up there.
 
 A few things worth knowing:
 
 - Your SDK token ships inside the firmware, so treat it as an identifier
-  rather than a password. If it leaks, revoke it on gadgets.muse.ai, generate
+  rather than a password. If it leaks, revoke it on gadgets.impo.ai, generate
   a new one, and rebuild.
 - **We strongly recommend enabling NVS encryption** if your board supports it.
   NVS stores Wi-Fi credentials and device tokens in flash; without encryption,
@@ -258,8 +255,8 @@ Run `idf.py build` once first so the downloaded components are in place.
 
 ## Community
 
-Meet other hackers who are building and customizing Muse gadgets in our
-community [Discord](https://discord.gg/3bhjCkZdd6). Get inspired, support each
+Meet other hackers who are building and customizing Impo gadgets in our
+community [Discord](https://discord.gg/84ZYn3xcGV). Get inspired, support each
 other, and share what you make.
 
 ## License

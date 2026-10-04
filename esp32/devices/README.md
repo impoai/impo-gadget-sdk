@@ -22,8 +22,8 @@ overlay: a short file of settings loaded on top of
 memory, button, and how the device shows its status. The ESP32-C5 DevKitC-1 is
 the default and needs no overlay.
 
-Every board pairs with the Muse app, joins your Wi-Fi, and holds an encrypted
-session to Muse. The rest depends on the hardware.
+Every board pairs with the Impo app, joins your Wi-Fi, and holds an encrypted
+session to Impo. The rest depends on the hardware.
 
 ## Supported devices
 
@@ -39,6 +39,7 @@ session to Muse. The rest depends on the hardware.
 | **Waveshare ESP32-S3-Touch-AMOLED-1.75** | ESP32-S3 | 1.75" 466×466 round AMOLED, touch | 16 MB / 8 MB | [Waveshare wiki](https://docs.waveshare.com/ESP32-S3-Touch-AMOLED-1.75), [GitHub](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75) | [Waveshare](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm) |
 | **Espressif ESP32-S3-BOX-3** | ESP32-S3 | 2.4" 320×240 LCD, touch | 16 MB / 16 MB | [Espressif BSP](https://github.com/espressif/esp-bsp/tree/master/bsp/esp-box-3), [ESP-BOX](https://github.com/espressif/esp-box) | — |
 | **AIPI Lite** | ESP32-S3 | 128×128 LCD | 16 MB / 8 MB | [xiaozhi-esp32 board](https://github.com/78/xiaozhi-esp32/tree/main/main/boards/xorigin/aipi-lite) | [AliExpress](https://www.aliexpress.com/w/wholesale-aipi-lite.html) |
+| **Espressif ESP-SparkBot** | ESP32-S3 | 240×240 LCD | 16 MB / 8 MB | [xiaozhi-esp32 board](https://github.com/78/xiaozhi-esp32/tree/main/main/boards/espressif/esp-sparkbot) | — |
 | **Waveshare ESP32-C6-Touch-AMOLED-1.8** | ESP32-C6 | 1.8" 368×448 AMOLED, touch | 16 MB / none | [Waveshare wiki](https://docs.waveshare.com/ESP32-C6-Touch-AMOLED-1.8) | [Waveshare](https://www.waveshare.com/esp32-c6-touch-amoled-1.8.htm) |
 | **Seeed SenseCAP Watcher** | ESP32-S3 | 1.45" 412×412 round LCD, touch | 32 MB / 8 MB | [Seeed wiki](https://wiki.seeedstudio.com/watcher/), [GitHub](https://github.com/Seeed-Studio/SenseCAP-Watcher-Firmware) | [Seeed Studio](https://www.seeedstudio.com/SenseCAP-Watcher-W1-A-p-5979.html) |
 | **M5Stack Cardputer ADV (experimental)** | ESP32-S3 | 1.14" 240×135 LCD | 8 MB / none | [M5Stack docs](https://docs.m5stack.com/en/core/Cardputer-Adv) | — |
@@ -49,70 +50,70 @@ session to Muse. The rest depends on the hardware.
 
 ## Features
 
-| | DevKitC-1 | ideaspark | SenseCAP Indicator | reTerminal E1001 | reTerminal E1002 | HA Voice PE | Waveshare S3 1.75C | Waveshare S3 1.75 | AIPI Lite | Waveshare C6 1.8 | Watcher | StickS3 | StickC Plus2 | Cardputer ADV | BOX-3 | StopWatch | CoreS3 |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:| :-: | :-: |:-:|:-:|
-| Home-network tunnel | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
-| Shows status on | Light | Screen | Screen | E-paper | E-paper | Light ring | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar |
-| Images from Muse | — | ✅ | ✅ | Black and white | Six colours | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
-| UI and settings | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Experimental | ✅ | ✅ | ✅ |
-| Push-to-talk | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | Text replies | ✅ | ✅ | ✅ | Text replies (experimental) | ✅ | ✅ | ✅ |
-| Speaker and mic | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Buzzer and mic | ES8311 (experimental) | ✅ | ✅ | ✅ |
-| Air sensors | — | — | D1S, D1Pro | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| Touch | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ |
-| Battery status | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Voltage only | — | — | ✅ | ✅ |
-| Over-the-air updates | Off | Off | Off | Off | Off | Off | On | On | On | On | On | On | On | Off | On | On | On |
-| Buttons | BOOT | BOOT | Top | Green | Green | Centre (talk), dial | PWR (talk), BOOT | BOOT (talk), PWR | Two | BOOT (talk), PWR | Wheel (press to talk, turn to sleep) | Front (talk), side (menu), PWR | Front (talk), side (menu), PWR | GO/Space (talk), Esc/Enter/arrows (menu) | BOOT/CONFIG (talk) | Yellow (talk), blue (sleep), PWR | PWR (talk), RST |
+| | DevKitC-1 | ideaspark | SenseCAP Indicator | reTerminal E1001 | reTerminal E1002 | HA Voice PE | Waveshare S3 1.75C | Waveshare S3 1.75 | AIPI Lite | ESP-SparkBot | Waveshare C6 1.8 | Watcher | StickS3 | StickC Plus2 | Cardputer ADV | BOX-3 | StopWatch | CoreS3 |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:| :-: | :-: |:-:|:-:|
+| Home-network tunnel | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
+| Shows status on | Light | Screen | Screen | E-paper | E-paper | Light ring | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar |
+| Images from Impo | — | ✅ | ✅ | Black and white | Six colours | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
+| UI and settings | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Experimental | ✅ | ✅ | ✅ |
+| Push-to-talk | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | Text replies | ✅ | ✅ | ✅ | Text replies (experimental) | ✅ | ✅ | ✅ |
+| Speaker and mic | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Buzzer and mic | ES8311 (experimental) | ✅ | ✅ | ✅ |
+| Air sensors | — | — | D1S, D1Pro | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| Touch | — | — | — | — | — | — | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ |
+| Battery status | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | Voltage only | — | — | ✅ | ✅ |
+| Over-the-air updates | Off | Off | Off | Off | Off | Off | On | On | On | On | On | On | On | On | Off | On | On | On |
+| Buttons | BOOT | BOOT | Top | Green | Green | Centre (talk), dial | PWR (talk), BOOT | BOOT (talk), PWR | Two | One | BOOT (talk), PWR | Wheel (press to talk, turn to sleep) | Front (talk), side (menu), PWR | Front (talk), side (menu), PWR | GO/Space (talk), Esc/Enter/arrows (menu) | BOOT/CONFIG (talk) | Yellow (talk), blue (sleep), PWR | PWR (talk), RST |
 
 Boards without PSRAM (the ideaspark, Waveshare C6 and Cardputer ADV) don't have room for
-the home-network tunnel. Muse can still reach and control them once the
+the home-network tunnel. Impo can still reach and control them once the
 control session is up. The Waveshare C6 and Cardputer ADV also can't hold their own voice
 session, so push-to-talk sends your voice note over its control session to the
-Muse it's paired with, and the reply scrolls past as text. It can't show images either: the UI holds a whole image in
+Impo it's paired with, and the reply scrolls past as text. It can't show images either: the UI holds a whole image in
 PSRAM, where the ideaspark draws one straight to its screen.
 
 The SenseCAP Indicator's sensors hang off its RP2040, which passes the
 readings to the ESP32-S3. The D1S and D1Pro have CO2 and tVOC sensors built
 in, and temperature and humidity come from the Grove AHT20 in the box (plug it
-in). Muse reads them all at once with `sensors.read`. This needs Seeed's stock
+in). Impo reads them all at once with `sensors.read`. This needs Seeed's stock
 RP2040 firmware.
 
 The reTerminal E1001's e-paper shows only black and white, 1 bit per pixel,
 and keeps its picture without power. It shows a still status screen (the
 agent's name, the character and a line of status text) that changes only when
-the status does, since each refresh takes a second or two. Images from Muse are dithered
+the status does, since each refresh takes a second or two. Images from Impo are dithered
 to black and white on the device and refresh once they are all in, with a
-brief black-and-white flash. `display.draw_url` tells Muse the bit depth.
+brief black-and-white flash. `display.draw_url` tells Impo the bit depth.
 
 The reTerminal E1002 is the same board with a six-colour E Ink Spectra 6
 panel: black, white, yellow, red, blue and green, 4 bits per pixel. It shows
-the same status screen, with the character in colour. Images from Muse are
+the same status screen, with the character in colour. Images from Impo are
 dithered to those six inks on the device (grays to black and white only),
 and each refresh takes about 30 seconds and flashes. `display.draw_url` tells
-Muse the six exact colours, the resolution and how slow it is.
+Impo the six exact colours, the resolution and how slow it is.
 
 The SenseCAP Watcher keeps its factory data (the identity SenseCraft uses) in
-an `nvsfactory` partition at `0x9000`, where Muse puts its partition table and
-NVS. It's unique to each Watcher, so back it up before you flash Muse the first
+an `nvsfactory` partition at `0x9000`, where Impo puts its partition table and
+NVS. It's unique to each Watcher, so back it up before you flash Impo the first
 time. To return to Seeed's firmware, flash it and then write the backup back:
 
 ```sh
-tools/muse/paced_esptool.py --chip esp32s3 -p PORT read-flash 0x9000 0x32000 nvsfactory.bin
-tools/muse/paced_esptool.py --chip esp32s3 -p PORT write-flash 0x9000 nvsfactory.bin
+tools/impo/paced_esptool.py --chip esp32s3 -p PORT read-flash 0x9000 0x32000 nvsfactory.bin
+tools/impo/paced_esptool.py --chip esp32s3 -p PORT write-flash 0x9000 nvsfactory.bin
 ```
 
 The Watcher's CH342 USB bridge corrupts reads at 921600 baud and above, so
 these use esptool's default of 115200. It also drops bytes when a whole packet
 arrives at once, so plain esptool can't upload its stub or write flash
 (`0107: Checksum error`, `0105: The format of the received message is
-invalid`). `tools/muse/paced_esptool.py` takes esptool's arguments and sends 64
-bytes at a time at the line rate; `tools/muse/board.sh flash watcher` uses it.
+invalid`). `tools/impo/paced_esptool.py` takes esptool's arguments and sends 64
+bytes at a time at the line rate; `tools/impo/board.sh flash watcher` uses it.
 
 The M5Stack StickS3 has 8 MB of flash, so it uses its own partition table with
 two smaller app slots. The front button is push-to-talk and the side button
-steps through the menu, as on the AIPI. Powering off from Muse turns off the
+steps through the menu, as on the AIPI. Powering off from Impo turns off the
 screen, speaker and codec and puts the ESP32-S3 in deep sleep; either button
 wakes it. Double-click the power button for a full power-off, and click it to
-turn back on. Muse turns off the power chip's green LED, which would otherwise
+turn back on. Impo turns off the power chip's green LED, which would otherwise
 stay lit. The IMU, IR and Grove port aren't used yet.
 [M5Unified](https://github.com/m5stack/M5Unified) is M5Stack's reference
 driver for the power chip and peripherals.
@@ -120,7 +121,7 @@ driver for the power chip and peripherals.
 M5Stack ships the StickS3 with UiFlow2, which hands the ESP32-S3's USB to its
 own driver and switches off the chip's USB serial port, so esptool can't find
 it. The power chip drives the boot pin (GPIO0), so there's no BOOT button
-either. To flash Muse the first time, put UiFlow2 in USB mode, open its REPL
+either. To flash Impo the first time, put UiFlow2 in USB mode, open its REPL
 (for example with `mpremote repl`) and paste:
 
 ```python
@@ -134,15 +135,15 @@ m[0x60008120] = (m[0x60008120] | (1 << 20)) & ~(1 << 19)  # give it the USB pins
 The REPL stops answering. Unplug the USB cable and plug it back in (the
 battery keeps the stick running), and it shows up as a USB JTAG/serial port.
 Anything that resets the stick now boots UiFlow2 again, so pass
-`--after no-reset` to esptool until Muse is on. Back up the flash, then flash
-Muse:
+`--after no-reset` to esptool until Impo is on. Back up the flash, then flash
+Impo:
 
 ```sh
 python -m esptool --chip esp32s3 -p PORT --after no-reset read-flash 0 0x800000 sticks3.bin
-tools/muse/board.sh flash sticks3 PORT
+tools/impo/board.sh flash sticks3 PORT
 ```
 
-Muse keeps the USB serial port on, so later flashes need none of this. To go
+Impo keeps the USB serial port on, so later flashes need none of this. To go
 back to UiFlow2, write the backup:
 
 ```sh
@@ -152,7 +153,7 @@ python -m esptool --chip esp32s3 -p PORT write-flash 0 sticks3.bin
 The M5Stack StopWatch has the same CO5300 round AMOLED as the Waveshare S3
 1.75C, with a CST820 touch controller and the StickS3's ES8311 audio. The
 yellow button (upper left) is push-to-talk and the blue one (upper right) puts
-the screen to sleep; settings are on the touch screen. Powering off from Muse
+the screen to sleep; settings are on the touch screen. Powering off from Impo
 turns off the screen, touch, audio and the expander's L3B rail and puts the
 ESP32-S3 in deep sleep; either button wakes it. Double-click the power button
 for a full power-off, and click it to turn back on. M5's IO expander (M5IOE1)
@@ -161,7 +162,7 @@ switches the panel and touch resets, audio power and the amp; its power chip
 Grove port aren't used yet. [M5Unified](https://github.com/m5stack/M5Unified)
 and M5's [factory firmware](https://github.com/m5stack/M5StopWatch-UserDemo)
 are the references. It enumerates as the chip's own USB serial port, so
-flashing needs nothing special: `tools/muse/board.sh flash stopwatch`.
+flashing needs nothing special: `tools/impo/board.sh flash stopwatch`.
 
 The M5Stack CoreS3 runs on Espressif's
 [BSP](https://github.com/espressif/esp-bsp/tree/master/bsp/m5stack_core_s3),
@@ -169,12 +170,12 @@ which brings up its ILI9342C LCD, FT6336U touch, AW88298 amp and ES7210
 microphones and switches the AXP2101's rails for each of them. It has no user
 button: PWR on the left side is push-to-talk and pairing confirmation, read
 from the AXP2101's key interrupts (its hardware power-off moves to a 10 s
-hold), and settings are on the touch screen (swipe left from Muse). RST on the
+hold), and settings are on the touch screen (swipe left from Impo). RST on the
 bottom edge restarts the board, and holding it for 3 s enters the bootloader.
-Powering off from Muse switches the AXP2101 off; click PWR to turn it back on.
+Powering off from Impo switches the AXP2101 off; click PWR to turn it back on.
 Its 1 W speaker is quiet, so the volume starts at 100%. The camera, proximity
 sensor, IMU, RTC, SD card and Grove ports aren't used yet. It enumerates as the
-chip's own USB serial port: `tools/muse/board.sh flash cores3`. If esptool
+chip's own USB serial port: `tools/impo/board.sh flash cores3`. If esptool
 can't connect, hold RST for 3 s, until the green LED lights, to enter the
 bootloader.
 
@@ -185,16 +186,16 @@ power button wakes the screen, and holding it for 2 s powers off. There's no
 power chip: the power button switches the stick on and the ESP32 keeps it on
 (GPIO4). Powering off lets go of that, which cuts the power on battery. On
 USB the stick stays powered, so the ESP32 also goes into deep sleep, and the
-front or power button wakes it. Muse speaks through a small passive buzzer,
+front or power button wakes it. Impo speaks through a small passive buzzer,
 so replies are quiet. The battery shows its voltage, but the stick can't tell
-Muse whether it's on USB or charging. The IMU, IR, RTC and Grove port aren't
+Impo whether it's on USB or charging. The IMU, IR, RTC and Grove port aren't
 used yet. [M5Unified](https://github.com/m5stack/M5Unified) and
 [M5GFX](https://github.com/m5stack/M5GFX) are M5Stack's reference drivers
 for the pins and peripherals.
 
 The Plus2's console is a CH9102 USB-UART bridge, which drops out above
-230400 baud, so `tools/muse/board.sh flash plus2` uses 230400. It comes with
-M5Stack's factory firmware. Back up the flash before you flash Muse for the
+230400 baud, so `tools/impo/board.sh flash plus2` uses 230400. It comes with
+M5Stack's factory firmware. Back up the flash before you flash Impo for the
 first time:
 
 ```sh
@@ -216,13 +217,13 @@ keyboard, BLE/Wi-Fi pairing, voice notes and text replies.
 - Menu power-off enters deep sleep; **GO** wakes it. Use the side switch
   for physical power-off.
 
-Replies may be shortened; use the Muse app for the full conversation.
+Replies may be shortened; use the Impo app for the full conversation.
 Spoken replies, images, the home-network tunnel, battery telemetry and
 extra peripherals (SD, IMU, IR, expansion) are not supported.
 
-Set your SDK token in `build-muse-m5stack-cardputer-adv/sdkconfig` (ignored
-by Git). Build with `tools/muse/board.sh build cardputer-adv` and flash with
-`tools/muse/board.sh flash cardputer-adv PORT`. To enter download mode,
+Set your SDK token in `build-impo-m5stack-cardputer-adv/sdkconfig` (ignored
+by Git). Build with `tools/impo/board.sh build cardputer-adv` and flash with
+`tools/impo/board.sh flash cardputer-adv PORT`. To enter download mode,
 switch off, hold GO while connecting USB, then release GO.
 
 Back up the original 8 MB firmware before flashing; keep it outside Git:
@@ -231,7 +232,7 @@ Back up the original 8 MB firmware before flashing; keep it outside Git:
 python -m esptool --chip esp32s3 -p PORT read-flash 0 0x800000 cardputer-adv-backup.bin
 ```
 
-Restore with `write-flash 0 cardputer-adv-backup.bin`. Pair in Muse under
+Restore with `write-flash 0 cardputer-adv-backup.bin`. Pair in Impo under
 Settings > Devices > Developer mode > Add Device, then press Enter.
 
 ## ESP32-S3-BOX-3
@@ -258,31 +259,32 @@ board's overlays, in order:
 | Seeed reTerminal E1001 | `esp32s3` | [`devices/sdkconfig.reterminal-e1001`](sdkconfig.reterminal-e1001) | `tools/board.sh reterminal-e1001 build` |
 | Seeed reTerminal E1002 | `esp32s3` | [`devices/sdkconfig.reterminal-e1002`](sdkconfig.reterminal-e1002) | `tools/board.sh reterminal-e1002 build` |
 | Home Assistant Voice PE | `esp32s3` | [`devices/sdkconfig.home-assistant-voice`](sdkconfig.home-assistant-voice) | `tools/board.sh home-assistant-voice build` |
-| Waveshare S3 1.75C | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-waveshare-s3-175c`](sdkconfig.muse-waveshare-s3-175c) | by hand |
-| Waveshare S3 1.75 | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-waveshare-s3-175`](sdkconfig.muse-waveshare-s3-175) | by hand |
-| Espressif ESP32-S3-BOX-3 | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-espressif-box-3`](sdkconfig.muse-espressif-box-3) | `tools/muse/board.sh build box3` |
-| AIPI Lite | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-aipi`](sdkconfig.muse-aipi) | by hand |
-| Waveshare C6 1.8 | `esp32c6` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-waveshare-c6-18`](sdkconfig.muse-waveshare-c6-18) | by hand |
-| SenseCAP Watcher | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-sensecap-watcher`](sdkconfig.muse-sensecap-watcher) | by hand |
-| M5Stack Cardputer ADV | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-cardputer-adv` | `tools/muse/board.sh build cardputer-adv` |
-| M5Stack StickS3 | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-m5stack-sticks3`](sdkconfig.muse-m5stack-sticks3) | by hand |
-| M5Stack StopWatch | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-m5stack-stopwatch`](sdkconfig.muse-m5stack-stopwatch) | by hand |
-| M5Stack CoreS3 | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-m5stack-cores3`](sdkconfig.muse-m5stack-cores3) | `tools/muse/board.sh build cores3` |
-| M5Stack StickC Plus2 | `esp32` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-m5stack-stickc-plus2`](sdkconfig.muse-m5stack-stickc-plus2) | by hand |
+| Waveshare S3 1.75C | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-waveshare-s3-175c`](sdkconfig.impo-waveshare-s3-175c) | by hand |
+| Waveshare S3 1.75 | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-waveshare-s3-175`](sdkconfig.impo-waveshare-s3-175) | by hand |
+| Espressif ESP32-S3-BOX-3 | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-espressif-box-3`](sdkconfig.impo-espressif-box-3) | `tools/impo/board.sh build box3` |
+| AIPI Lite | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-aipi`](sdkconfig.impo-aipi) | by hand |
+| Espressif ESP-SparkBot | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-espressif-sparkbot`](sdkconfig.impo-espressif-sparkbot) | `tools/impo/board.sh build sparkbot` |
+| Waveshare C6 1.8 | `esp32c6` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-waveshare-c6-18`](sdkconfig.impo-waveshare-c6-18) | by hand |
+| SenseCAP Watcher | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-sensecap-watcher`](sdkconfig.impo-sensecap-watcher) | by hand |
+| M5Stack Cardputer ADV | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-cardputer-adv` | `tools/impo/board.sh build cardputer-adv` |
+| M5Stack StickS3 | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-m5stack-sticks3`](sdkconfig.impo-m5stack-sticks3) | by hand |
+| M5Stack StopWatch | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-m5stack-stopwatch`](sdkconfig.impo-m5stack-stopwatch) | by hand |
+| M5Stack CoreS3 | `esp32s3` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-m5stack-cores3`](sdkconfig.impo-m5stack-cores3) | `tools/impo/board.sh build cores3` |
+| M5Stack StickC Plus2 | `esp32` | [`devices/sdkconfig.impo`](sdkconfig.impo), [`devices/sdkconfig.impo-m5stack-stickc-plus2`](sdkconfig.impo-m5stack-stickc-plus2) | by hand |
 
 `tools/board.sh BOARD [build|flash|monitor|flash-monitor] [PORT]` builds each
 board in its own `build-<board>` directory. For the boards with the full UI, run `idf.py`
 with the target and overlays from the table:
 
 ```sh
-idf.py -B build-muse-aipi -DIDF_TARGET=esp32s3 \
-  -DSDKCONFIG=build-muse-aipi/sdkconfig \
-  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-aipi" build
+idf.py -B build-impo-aipi -DIDF_TARGET=esp32s3 \
+  -DSDKCONFIG=build-impo-aipi/sdkconfig \
+  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.impo;devices/sdkconfig.impo-aipi" build
 ```
 
 To flash, add `-p PORT flash` with the same arguments. Boards with the full UI need 16 MB
 of flash or more, except the StickS3, StickC Plus2 and Cardputer ADV, whose overlays switch
-to the 8 MB layout in [`partitions_muse_8mb.csv`](../partitions_muse_8mb.csv).
+to the 8 MB layout in [`partitions_impo_8mb.csv`](../partitions_impo_8mb.csv).
 [`AGENTS.md`](../AGENTS.md) covers flashing, monitoring, and what to do when a
 build picks up stale settings.
 
@@ -302,13 +304,13 @@ as well. [`AGENTS.md`](AGENTS.md) walks through every kind of board, from the
 overlay to testing on hardware.
 
 Got it working on something new? Share it in the
-[Muse Gadgets Discord](https://discord.gg/3bhjCkZdd6).
+[Impo Gadgets Discord](https://discord.gg/84ZYn3xcGV).
 
 ### Watcher camera
 
 Camera support is disabled by default. In the Watcher build's `menuconfig`,
-under **Muse**, enable **SenseCAP Watcher camera capture and live preview**
-(`CONFIG_MUSE_WATCHER_CAMERA=y`) and rebuild. It requires PSRAM. Disabled
+under **Impo**, enable **SenseCAP Watcher camera capture and live preview**
+(`CONFIG_IMPO_WATCHER_CAMERA=y`) and rebuild. It requires PSRAM. Disabled
 builds omit the camera worker, shutter UI, double-click gesture, and
 `camera.capture` command.
 

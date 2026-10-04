@@ -22,7 +22,7 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
-/* Match the display format and refresh period used by Muse firmware. */
+/* Match the display format and refresh period used by Impo firmware. */
 #define LV_COLOR_DEPTH 16
 #define LV_DEF_REFR_PERIOD 15
 
@@ -49,7 +49,7 @@
 
 #define LV_OBJ_STYLE_CACHE 1
 
-/* Keep these in sync with devices/sdkconfig.muse and the Watcher overlay. */
+/* Keep these in sync with devices/sdkconfig.impo and the Watcher overlay. */
 #define LV_FONT_MONTSERRAT_12 0
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1

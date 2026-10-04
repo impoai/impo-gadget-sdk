@@ -21,24 +21,24 @@ How to work on this Linux client, test it, and deploy it to a device. See
 
 ## What this is
 
-A Python package (`musegadget`) that makes any Linux computer into a Muse
-Home Link. It pairs with the Muse phone app over BLE, then holds an encrypted
-Noise session to the user's Muse VM and runs the commands Muse sends it. It is
+A Python package (`impogadget`) that makes any Linux computer into a Impo
+Home Link. It pairs with the Impo phone app over BLE, then holds an encrypted
+Noise session to the user's Impo VM and runs the commands Impo sends it. It is
 the Linux counterpart of the ESP32 firmware in `../esp32` and speaks the same
 pairing and control protocols, so the same app pairs either.
 
 | Module | Role |
 |---|---|
-| `cli.py` | `musegadget pair`, `run`, `say`, `info`, `unpair` |
+| `cli.py` | `impogadget pair`, `run`, `say`, `info`, `unpair` |
 | `pairing.py` | Community pairing v5: P-256 ECDH, HKDF-SHA256, AES-256-GCM, `confirm_app` |
 | `ble_framing.py` | Chunked BLE framing (`0xFE`, index, total, payload) |
 | `ble_setup.py` | Setup commands behind the GATT characteristics (no BlueZ dependency) |
 | `ble_server.py` | BlueZ GATT peripheral and advertisement over D-Bus (GLib loop) |
-| `identity.py` | Persistent identity: `homelink-xxxxxx` node id, `MuseGadgetXXXXXX` BLE name |
-| `muse_api.py` | `fetch_vms` and device token refresh |
+| `identity.py` | Persistent identity: `homelink-xxxxxx` node id, `ImpoGadgetXXXXXX` BLE name |
+| `impo_api.py` | `fetch_vms` and device token refresh |
 | `link_client.py` | One session: `/v1/noise` upgrade, Noise XX, `/link-control`, `/chat/stream` |
-| `service.py` | `musegadget run`: reconnect loop, token rotation, local socket |
-| `executor.py`, `fileops.py` | The commands Muse can run, as the chosen account |
+| `service.py` | `impogadget run`: reconnect loop, token rotation, local socket |
+| `executor.py`, `fileops.py` | The commands Impo can run, as the chosen account |
 | `noise/` | Noise XX handshake, framing and service envelopes |
 | `data/` | The systemd unit and the hash-pinned `requirements.lock`, shipped in the package |
 
@@ -83,7 +83,7 @@ bash install.sh --from . --yes      # doesn't ask
 ```
 
 Reinstalling keeps the pairing. It restarts the service, which kills any
-command Muse is running at that moment, so check the log for recent `invoke`
+command Impo is running at that moment, so check the log for recent `invoke`
 lines first.
 
 For a quicker loop, build a wheel and install it into the existing venv:
@@ -91,8 +91,8 @@ For a quicker loop, build a wheel and install it into the existing venv:
 ```sh
 uv build --wheel
 # on the device:
-sudo /opt/musegadget/venv/bin/pip install --no-deps --force-reinstall musegadget-*.whl
-sudo systemctl restart musegadget
+sudo /opt/impogadget/venv/bin/pip install --no-deps --force-reinstall impogadget-*.whl
+sudo systemctl restart impogadget
 ```
 
 Installer flags: `--run-as USER`, `--no-pair`, `--yes`, `--from SOURCE`,
@@ -101,24 +101,24 @@ Installer flags: `--run-as USER`, `--no-pair`, `--yes`, `--from SOURCE`,
 ## Run and debug
 
 ```sh
-sudo journalctl -u musegadget -f     # service log
-sudo musegadget -v pair              # pairing, verbose
-musegadget info                      # identity and pairing state
+sudo journalctl -u impogadget -f     # service log
+sudo impogadget -v pair              # pairing, verbose
+impogadget info                      # identity and pairing state
 ```
 
-State lives in `/var/lib/musegadget` (mode 0700): `identity.json` survives
+State lives in `/var/lib/impogadget` (mode 0700): `identity.json` survives
 unpairing, `pairing.json` holds the device tokens. The local socket is
-`/run/musegadget/musegadget.sock`, owned by root and the run-as account's group.
+`/run/impogadget/impogadget.sock`, owned by root and the run-as account's group.
 
 A healthy start logs `commands run as <user>`, `Noise session established`,
-`sent link.register` and `registered with the Muse`.
+`sent link.register` and `registered with the Impo`.
 
 ## Pairing
 
 - Community mode only: `pairing_auth: "none"`, epoch 0, policy `confirm_app`.
   A Pi has no button, so the app's own confirmation stands in for it, and BLE
-  only advertises while `musegadget pair` runs.
-- The BLE name is `MuseGadget` plus the last six hex digits of the identity,
+  only advertises while `impogadget pair` runs.
+- The BLE name is `ImpoGadget` plus the last six hex digits of the identity,
   with **no hyphen**: the apps compare the text after the prefix with the text
   after `homelink-` in the node id. `get_device_info` must report
   `model: "hatch_link"`.
@@ -137,7 +137,7 @@ A healthy start logs `commands run as <user>`, `Noise session established`,
 - GATT status 133 on the phone is usually stale Bluetooth state on the phone.
   Toggling the phone's Bluetooth clears it.
 
-## Talking to the Muse
+## Talking to the Impo
 
 - Connect to `wss://<noise_host>/v1/noise?vm_id=<vm_id>` with the per-VM bearer
   from `fetch_vms` in an `Authorization` header. A 401 or 403 on the upgrade
@@ -145,15 +145,15 @@ A healthy start logs `commands run as <user>`, `Noise session established`,
 - After the Noise handshake, open `POST /link-control` and leave the body open.
   Both directions carry JSON messages, each prefixed with a little-endian u32
   length. The device sends `link.register`, then a `link.result` for each
-  `link.invoke`. `link.unpaired` means the Muse removed the device.
+  `link.invoke`. `link.unpaired` means the Impo removed the device.
 - Register as `platform: "linux"`, `device_family: "homehub"`. Never use family
   `link` or advertise `device.ota`: the server pushes ESP32 firmware updates to
   every `link` device.
-- Messages from the device to the Muse (`musegadget send-user-msg`) go as separate
+- Messages from the device to the Impo (`impogadget send-user-msg`) go as separate
   `POST /chat/stream` requests on the same session, with `device_id` set to the
   node id and `"output_modality": "text"`. `session_id` picks the chat;
   `chat_id` is not an API field and is ignored. The response is only the ack
-  (`message_id`); the reply appears in the Muse chat. Replies are text: to
+  (`message_id`); the reply appears in the Impo chat. Replies are text: to
   speak them, use a text-to-speech API of your choice.
 - The VM accepts at most 256 KB per message from the device, so command output
   is cut at 96 KB per stream.
@@ -168,20 +168,20 @@ A healthy start logs `commands run as <user>`, `Noise session established`,
    `self._child_options()`, so it runs as the chosen account and not as root.
 4. Add a test in `tests/test_executor.py`.
 
-Muse sees the new command after the service restarts and re-registers.
+Impo sees the new command after the service restarts and re-registers.
 
-## Say Muse, never Hatch
+## Say Impo, never Hatch
 
 Users never see the name Hatch.
 
-- Anything a person reads says Muse, the Muse app, or the Muse's name:
+- Anything a person reads says Impo, the Impo app, or the Impo's name:
   - CLI output and help
   - log lines
   - errors
   - docs
-- Don't use `hatch` in a new file name or identifier. Use `muse` or
-  `musegadget`. The device API client is `muse_api.py`.
-- `hatch` stays only where the server or the Muse app depends on it. Don't
+- Don't use `hatch` in a new file name or identifier. Use `impo` or
+  `impogadget`. The device API client is `impo_api.py`.
+- `hatch` stays only where the server or the Impo app depends on it. Don't
   rename these:
   - the host `gadgets.impo.ai`
   - the `hatch_refresh:` auth prefix
@@ -193,4 +193,4 @@ Users never see the name Hatch.
 1. The tests pass, on the newest Python and on Python 3.9 with cryptography
    3.3.2 if you touched pairing or the Noise code.
 2. If you changed `install.sh`, it passes ShellCheck.
-3. If you deployed, the log shows `registered with the Muse` and no tracebacks.
+3. If you deployed, the log shows `registered with the Impo` and no tracebacks.

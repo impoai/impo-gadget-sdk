@@ -25,7 +25,7 @@
 
 static const char *TAG = "link.identity";
 
-// Device identity. The device advertises over BLE as "MuseGadget-XXXXXX" and
+// Device identity. The device advertises over BLE as "ImpoGadget-XXXXXX" and
 // identifies itself to the remote service as node_id "homelink-XXXXXX"
 // (device-token mint/refresh). XXXXXX = last 3 WiFi
 // STA MAC octets in hex. Builds may change the visible BLE prefix

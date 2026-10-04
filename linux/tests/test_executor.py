@@ -21,8 +21,8 @@ import time
 
 import pytest
 
-from musegadget import executor
-from musegadget.executor import Account, Executor
+from impogadget import executor
+from impogadget.executor import Account, Executor
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from musegadget.ble_framing import ChunkAssembler, encode_chunks
+from impogadget.ble_framing import ChunkAssembler, encode_chunks
 
 
 @pytest.mark.parametrize("mtu, per_chunk", [(23, 17), (185, 157), (256, 157), (3, 17)])

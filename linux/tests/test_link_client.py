@@ -20,14 +20,14 @@ import struct
 
 import pytest
 
-from musegadget.link_client import (
+from impogadget.link_client import (
     DeviceDescription, LinkSession, MessageDecoder, Outcome, encode_message, noise_url,
 )
-from musegadget.noise import (
+from impogadget.noise import (
     ApplicationResponse, BodyChunk, NoiseFrameDecoder, NoiseXXResponder, ServiceFrame,
     encode_noise_frames,
 )
-from musegadget.noise.transport import decode_request_envelope, encode_response_envelope
+from impogadget.noise.transport import decode_request_envelope, encode_response_envelope
 
 DEVICE = DeviceDescription(
     node_id="homelink-abcdef", display_name="pi", version="0.1.0",
@@ -55,7 +55,7 @@ class Pipe:
 
 
 class FakeVm:
-    """Just enough of the Muse VM: Noise responder plus the control stream."""
+    """Just enough of the Impo VM: Noise responder plus the control stream."""
 
     def __init__(self, ws: Pipe) -> None:
         self.ws = ws

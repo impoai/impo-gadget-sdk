@@ -23,8 +23,8 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from musegadget import pairing
-from musegadget.pairing import PairingError, PairingSession, PairingState
+from impogadget import pairing
+from impogadget.pairing import PairingError, PairingSession, PairingState
 
 VECTORS = json.loads(
     (Path(__file__).parent / "vectors" / "link_pairing_v5.json").read_text()

@@ -26,27 +26,27 @@ endif()
 # TCP limits: the no-PSRAM Cardputer has no tunnel and uses four-MSS windows.
 if((NOT CONFIG_LWIP_TCP_SND_BUF_DEFAULT EQUAL 16384 OR
     NOT CONFIG_LWIP_TCP_WND_DEFAULT EQUAL 16384) AND
-   NOT (CONFIG_MUSE_BOARD_M5STACK_CARDPUTER_ADV AND NOT CONFIG_SPIRAM AND
+   NOT (CONFIG_IMPO_BOARD_M5STACK_CARDPUTER_ADV AND NOT CONFIG_SPIRAM AND
         NOT CONFIG_HOMEHUB_TUNNEL AND CONFIG_LWIP_TCP_SND_BUF_DEFAULT EQUAL 5760 AND
         CONFIG_LWIP_TCP_WND_DEFAULT EQUAL 5760))
     message(FATAL_ERROR
         "ESP32 Device SDK requires TCP send buffer and receive window 16384 (5760 on the no-tunnel Cardputer ADV) for DMA headroom. ${GADGET_CONFIG_REGEN_HINT}")
 endif()
 
-# A token from gadgets.muse.ai is mgst_ plus 43 canonical base64url characters.
+# A token from gadgets.impo.ai is mgst_ plus 43 canonical base64url characters.
 # Manufacturer builds pair with fleet attestation instead.
 if("${CONFIG_GADGET_SDK_TOKEN}" STREQUAL "")
     if(NOT CONFIG_HOMEHUB_PAIRING_EFUSE_AUTH)
         message(WARNING
             "No SDK token: set CONFIG_GADGET_SDK_TOKEN (idf.py menuconfig > ESP32 Device SDK) "
-            "to the token from gadgets.muse.ai. Gadgets without one will stop pairing.")
+            "to the token from gadgets.impo.ai. Gadgets without one will stop pairing.")
     endif()
 else()
     string(LENGTH "${CONFIG_GADGET_SDK_TOKEN}" GADGET_SDK_TOKEN_LENGTH)
     if(NOT GADGET_SDK_TOKEN_LENGTH EQUAL 48 OR
        NOT CONFIG_GADGET_SDK_TOKEN MATCHES "^mgst_[A-Za-z0-9_-]*[AEIMQUYcgkosw048]$")
         message(FATAL_ERROR
-            "CONFIG_GADGET_SDK_TOKEN is not a valid SDK token. Copy it again from gadgets.muse.ai.")
+            "CONFIG_GADGET_SDK_TOKEN is not a valid SDK token. Copy it again from gadgets.impo.ai.")
     endif()
 endif()
 

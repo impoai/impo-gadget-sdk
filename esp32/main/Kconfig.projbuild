@@ -16,7 +16,7 @@ menu "ESP32 Device SDK"
 
     config GADGET_PRODUCT_NAME
         string "Human-visible product name for log messages"
-        default "Muse Gadget"
+        default "Impo Gadget"
         help
             The product name shown in boot banners, log messages, and
             diagnostic text. Does not affect protocol identifiers or
@@ -24,11 +24,11 @@ menu "ESP32 Device SDK"
             the shipping product name.
 
     config GADGET_SDK_TOKEN
-        string "Muse Gadgets SDK token"
+        string "Impo Gadgets SDK token"
         default ""
         help
-            Your mgst_ SDK token from gadgets.muse.ai (Account > SDK tokens).
-            Every gadget needs one to pair. The device hands it to the Muse
+            Your mgst_ SDK token from gadgets.impo.ai (Account > SDK tokens).
+            Every gadget needs one to pair. The device hands it to the Impo
             app inside the encrypted pairing session and includes it when it
             refreshes its device token.
 
@@ -129,7 +129,7 @@ menu "ESP32 Device SDK"
 
     config HOMEHUB_BLE_NAME_PREFIX
         string "Visible BLE name prefix"
-        default "MuseGadget"
+        default "ImpoGadget"
         help
             The device advertises as "<prefix><suffix>-XXXXXX", where XXXXXX
             is the last three Wi-Fi STA MAC octets. Keep prefix and suffix
@@ -142,7 +142,7 @@ menu "ESP32 Device SDK"
         help
             Appended to HOMEHUB_BLE_NAME_PREFIX. Bench boards set one, such as
             "-Disp", so they are easy to tell apart while keeping the build's
-            prefix: MuseGadget-Disp in the open-source build, HomeLink-Disp in
+            prefix: ImpoGadget-Disp in the open-source build, HomeLink-Disp in
             the internal one.
 
     config HOMEHUB_BUTTON_GPIO
@@ -154,14 +154,14 @@ menu "ESP32 Device SDK"
         help
             GPIO connected to the button, independently of the status LED.
             Uses an internal pull-up and treats a low level as pressed.
-            Muse Home Link and the ESP32-C5 DevKitC-1 BOOT button both use GPIO28.
+            Impo Home Link and the ESP32-C5 DevKitC-1 BOOT button both use GPIO28.
 
     choice HOMEHUB_LED_BACKEND
         prompt "Status LED hardware"
         default HOMEHUB_LED_BACKEND_PWM_RGB
         help
             Select the physical status LED implementation for this build. The
-            Muse Home Link board uses a 3-channel PWM RGB LED. A stock
+            Impo Home Link board uses a 3-channel PWM RGB LED. A stock
             ESP32-C5 DevKitC-1 has a single addressable RGB LED on GPIO27.
             The always-on red power LED on the DevKitC-1 is not firmware
             controlled. The ideaspark ESP32 board and the SenseCAP Indicator
@@ -175,7 +175,7 @@ menu "ESP32 Device SDK"
             and connection state instead.
 
         config HOMEHUB_LED_BACKEND_PWM_RGB
-            bool "Muse Home Link PWM RGB LED"
+            bool "Impo Home Link PWM RGB LED"
 
         config HOMEHUB_LED_BACKEND_DEVKIT_GPIO27
             bool "ESP32-C5 DevKitC-1 GPIO27 addressable RGB LED"
@@ -199,9 +199,9 @@ menu "ESP32 Device SDK"
             bool "Home Assistant Voice PE 12-LED ring"
             depends on IDF_TARGET_ESP32S3
 
-        config HOMEHUB_LED_BACKEND_MUSE
-            bool "Muse display"
-            depends on MUSE_ENABLED
+        config HOMEHUB_LED_BACKEND_IMPO
+            bool "Impo display"
+            depends on IMPO_ENABLED
 
         config HOMEHUB_LED_BACKEND_NONE
             bool "No status LED"
@@ -234,9 +234,9 @@ menu "ESP32 Device SDK"
         help
             Hold the centre button, speak, release: the audio goes to the
             agent's chat as a voice note, which the VM transcribes, and the
-            reply appears in the Muse app as text. To speak it, plug a TTS
-            API of your own into start_tts in muse_chat_session.cpp. This
-            uses a second Noise session (Muse's voice session) with Link's
+            reply appears in the Impo app as text. To speak it, plug a TTS
+            API of your own into start_tts in impo_chat_session.cpp. This
+            uses a second Noise session (Impo's voice session) with Link's
             account. While the mute
             switch is on, the button keeps its setup role (tap to confirm
             pairing, hold to reset).
@@ -255,7 +255,7 @@ menu "ESP32 Device SDK"
     config HOMEHUB_DISPLAY_COMMANDS
         bool
         default y if HOMEHUB_DISPLAY
-        default y if HOMEHUB_LED_BACKEND_MUSE && SPIRAM
+        default y if HOMEHUB_LED_BACKEND_IMPO && SPIRAM
         help
             Set when display.draw_url can draw a downloaded image: the
             display backends, and boards with the full UI and PSRAM for the image.
