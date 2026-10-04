@@ -249,7 +249,7 @@ static void expect_empty_tokens(const vm_device_tokens_t *tokens) {
 }
 
 static void expect_url(const recorded_request_t *request, const char *suffix) {
-    const char *base = "https://api.muse.ai";
+    const char *base = "https://gadgets.impo.ai";
     char expected[256];
     snprintf(expected, sizeof(expected), "%s%s", base, suffix);
     CHECK(strcmp(request->url, expected) == 0, "unexpected url: %s", request->url);
@@ -636,11 +636,11 @@ static void test_set_base_url_changes_fetch_target(void) {
         const char *override;
         const char *base;
     } cases[] = {
-        {"https://api.muse.ai", "https://api.muse.ai"},
+        {"https://gadgets.impo.ai", "https://gadgets.impo.ai"},
         {"https://custom-api.example.com", "https://custom-api.example.com"},
-        {NULL, "https://api.muse.ai"},
+        {NULL, "https://gadgets.impo.ai"},
         {"https://custom-api.example.com", "https://custom-api.example.com"},
-        {"", "https://api.muse.ai"},
+        {"", "https://gadgets.impo.ai"},
     };
     const char *paths[] = {
         "/fetch_vms", "/device_token/mint",

@@ -127,7 +127,7 @@ A healthy start logs `commands run as <user>`, `Noise session established`,
   ignores the Wi-Fi fields it gets back. It never stores them.
 - `provision_v2` carries `api_url`, which only older firmware reads (it adds
   `/hatch/`). This client ignores it and uses `api_url_v2` when newer apps
-  send it, or `https://api.muse.ai`, with bare API paths either way.
+  send it, or `https://gadgets.impo.ai`, with bare API paths either way.
 - The Android app writes `negotiatedMtu - 3` bytes with no cap, and Android
   rejects writes over 512 bytes. BlueZ must have `[GATT] ExchangeMTU = 256` in
   `/etc/bluetooth/main.conf`; the installer sets it. Symptom if it's missing:
@@ -183,7 +183,7 @@ Users never see the name Hatch.
   `musegadget`. The device API client is `muse_api.py`.
 - `hatch` stays only where the server or the Muse app depends on it. Don't
   rename these:
-  - the host `hatch.metaaivm.com`
+  - the host `gadgets.impo.ai`
   - the `hatch_refresh:` auth prefix
   - pairing labels and ids such as `hatch-link-pairing-v5`, the `hatch_link`
     model and the `hatch-link:` device id, and the test vectors

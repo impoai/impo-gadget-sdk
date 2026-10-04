@@ -429,13 +429,13 @@ Users never see the name Hatch.
   - docs
 - Don't use `hatch` in a new file name or identifier. Use `muse` or
   `muse_gadget`. The Muse chat code is `components/muse/muse_chat*`.
-- The ESP32 account clients use `https://api.muse.ai`, or the `api_url_v2`
+- The ESP32 account clients use `https://gadgets.impo.ai`, or the `api_url_v2`
   base the app sends during pairing, with bare API paths. They ignore
   `api_url`: only older firmware reads it, and that firmware adds `/hatch/`
   itself. Keep saving it so a device flashed back to older firmware still works.
 - `hatch` stays only where the server or the Muse app depends on it. Don't
   rename these:
-  - the VM host `hatch.metaaivm.com`
+  - the VM host `gadgets.impo.ai`
   - the `hatch_refresh:` auth prefix, the `hatch-web` app id and the
     `HatchLink/` user agent
   - pairing labels and ids such as `hatch-link-pairing-v%d`, the `hatch_link`

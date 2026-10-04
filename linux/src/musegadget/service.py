@@ -40,7 +40,7 @@ from musegadget.link_client import DeviceDescription, LinkSession, Outcome
 
 log = logging.getLogger(__name__)
 
-DEFAULT_NOISE_HOST = "hatch.metaaivm.com"
+DEFAULT_NOISE_HOST = "gadgets.impo.ai"
 BACKOFF_BASE_S = 2.0
 BACKOFF_MAX_S = 60.0
 AUTH_BACKOFF_MIN_S = 15.0

@@ -56,7 +56,7 @@ using namespace musegadgets::noise::core;
 
 static const char *TAG = "link.noise_ctrl";
 
-#define NOISE_DEFAULT_HOST "hatch.metaaivm.com"
+#define NOISE_DEFAULT_HOST "gadgets.impo.ai"
 static char s_noise_host[256] = NOISE_DEFAULT_HOST;
 #define NOISE_PATH       "/v1/noise"
 #define NOISE_PORT       443

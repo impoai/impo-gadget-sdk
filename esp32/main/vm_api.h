@@ -21,7 +21,7 @@
 #define VM_API_MAX_VMS 8
 #define VM_API_ERR_FAILED -1
 #define VM_API_ERR_AUTH   -2
-#define VM_API_DEFAULT_BASE_URL "https://api.muse.ai"
+#define VM_API_DEFAULT_BASE_URL "https://gadgets.impo.ai"
 
 typedef struct {
     char *vm_url;

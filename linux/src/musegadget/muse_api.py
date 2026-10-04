@@ -27,7 +27,7 @@ from musegadget import __version__
 
 log = logging.getLogger(__name__)
 
-API_BASE = "https://api.muse.ai"
+API_BASE = "https://gadgets.impo.ai"
 FETCH_PATH = "/fetch_vms"
 REFRESH_PATH = "/device_token/refresh"
 

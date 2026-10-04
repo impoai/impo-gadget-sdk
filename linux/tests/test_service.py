@@ -166,4 +166,4 @@ def test_a_rejected_sdk_token_report_keeps_the_pairing(tmp_path, monkeypatch):
 
 def test_api_root_uses_api_url_v2_or_the_muse_api():
     assert muse_api.api_root("https://api.example/") == "https://api.example"
-    assert muse_api.api_root() == "https://api.muse.ai"
+    assert muse_api.api_root() == "https://gadgets.impo.ai"

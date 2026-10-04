@@ -16,6 +16,18 @@ limitations under the License.
 
 # Muse Gadgets
 
+> **Impo fork.** This is [Impo](https://impo.ai)'s fork of
+> [facebookincubator/muse-gadget-sdk](https://github.com/facebookincubator/muse-gadget-sdk).
+> The only change is the default server: gadgets built from this fork connect
+> to `https://gadgets.impo.ai` instead of `https://api.muse.ai` and
+> `hatch.metaaivm.com`. The protocol, firmware and SDK code are otherwise
+> upstream, and a gadget still follows `api_url_v2` and `noise_host` when
+> setup provides them. See [gadgets.impo.ai](https://gadgets.impo.ai) for what
+> the Impo gateway supports today; pairing from the Impo app is not available
+> yet, and an SDK token is not required by the Impo gateway. Muse is a
+> trademark of Meta Platforms, Inc.; Impo is not affiliated with or endorsed
+> by Meta. The rest of this document is upstream's.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/images/muse-gadgets-dark.png">

@@ -880,7 +880,7 @@ static bool ensure_connected(void)
     muse_hatch_report(MUSE_HATCH_TESTING, "Connecting...");
     muse_settings_hatch_host(s_host);
     if (!s_host[0]) {
-        strlcpy(s_host, "hatch.metaaivm.com", sizeof(s_host));
+        strlcpy(s_host, "gadgets.impo.ai", sizeof(s_host));
     }
     char err[48] = "";
     for (int attempt = 0; attempt < 2; attempt++) {

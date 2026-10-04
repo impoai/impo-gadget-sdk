@@ -30,7 +30,7 @@
 
 static const char *TAG = "muse_account_api";
 
-#define FETCH_URL "https://api.muse.ai/fetch_vms"
+#define FETCH_URL "https://gadgets.impo.ai/fetch_vms"
 #define MAX_RESPONSE (32 * 1024)
 #define ATTEMPTS 3   /* the first DNS lookup after Wi-Fi comes up often fails */
 
