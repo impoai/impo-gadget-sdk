@@ -1490,8 +1490,9 @@ esp_err_t impo_ui_start(void)
     s_w = impo_board->width;
     s_h = impo_board->height;
     /* The full layout assumes room for the 466 px board's header and bottom
-     * captions. Short landscape panels (BOX-3) need the compact layout too. */
-    bool short_landscape = s_w > s_h && s_h < 320;
+     * captions, which it places past the bottom of a shorter flat panel. Short
+     * landscape and square ones (BOX-3, SparkBot) need the compact layout too. */
+    bool short_landscape = s_w >= s_h && s_h < 320 && !impo_board->round;
     s_small = s_h < 200 || s_w < 200 || short_landscape;
     s_tall = s_small && s_h >= s_w + 64;
     /* Small screens keep room for the status line and button icons. A narrow

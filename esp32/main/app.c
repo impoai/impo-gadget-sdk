@@ -2042,7 +2042,17 @@ static void on_pairing_client_finished(uint32_t session_generation) {
         ESP_LOGE(TAG, "failed to start pairing confirmation timer");
         ble_server_send_pairing_status("error_pairing_unavailable", session_generation);
         ble_server_disconnect_pairing_session(session_generation);
+        return;
     }
+#if CONFIG_HOMEHUB_PAIRING_AUTO_CONFIRM
+    // No press: the phone still sees confirm_required then pairing_confirmed,
+    // so the protocol is unchanged, but anyone in range can pair this gadget.
+    uint32_t confirmed = link_pairing_confirm_active_session();
+    if (confirmed) {
+        notify_pairing_confirmed(confirmed);
+        ESP_LOGW(TAG, "pairing confirmed without a button press (auto-confirm build)");
+    }
+#endif
 }
 
 static void on_client_connected(void) {

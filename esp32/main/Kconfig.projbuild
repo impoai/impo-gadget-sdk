@@ -145,6 +145,16 @@ menu "ESP32 Device SDK"
             prefix: ImpoGadget-Disp in the open-source build, HomeLink-Disp in
             the internal one.
 
+    config HOMEHUB_PAIRING_AUTO_CONFIRM
+        bool "Confirm BLE pairing without a button press"
+        default n
+        help
+            Accepts a phone's pairing as soon as it asks, instead of waiting
+            for a press on the gadget. The press is what proves the person
+            pairing holds the gadget: with this on, anyone in Bluetooth range
+            of an unpaired gadget can pair it to their own account. For demo
+            units and boards whose button is hard to reach.
+
     config HOMEHUB_BUTTON_GPIO
         int "Active-low setup/reset button GPIO"
         range 0 28 if IDF_TARGET_ESP32C5
