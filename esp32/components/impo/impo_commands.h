@@ -43,6 +43,10 @@ typedef struct {
 /* Adds every command of this gadget to the link.register "commands_v2" object. */
 void impo_commands_describe(cJSON *commands);
 
+/* Adds the link.register "capabilities" object: what this gadget has, as
+ * CAPABILITIES.md defines it, from the board and the build. */
+void impo_commands_capabilities(cJSON *params);
+
 /* Runs `name` if it is one of these commands; NULL means it is not. */
 cJSON *impo_commands_run(const char *name, const cJSON *params);
 

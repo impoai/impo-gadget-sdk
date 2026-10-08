@@ -814,6 +814,7 @@ static const impo_board_t s_board = {
     .power_off = power_off,
     .commands = s_commands,
     .command_count = sizeof(s_commands) / sizeof(s_commands[0]),
+    .features = "motion_sensor,touch_pads,locomotion,lights",
 };
 
 /* Home Link's app_main starts Impo with this board (main/main.c). */

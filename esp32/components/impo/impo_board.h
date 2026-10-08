@@ -106,6 +106,9 @@ typedef struct {
     /* Commands only this board has (impo_commands.h); may be left out. */
     const impo_command_t *commands;
     int command_count;
+    /* What else the board has, for the capabilities it registers (CAPABILITIES.md):
+     * a comma-separated list such as "motion_sensor,locomotion,lights", or NULL. */
+    const char *features;
 } impo_board_t;
 
 /* The running board, set by impo_app_run(). */

@@ -19,6 +19,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "sdkconfig.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,7 +32,11 @@ extern "C" {
  */
 
 /* The gadget has a camera to offer; its name for the command's description. */
+#if CONFIG_IMPO_CAMERA
 const char *impo_camera_name(void);
+#else
+static inline const char *impo_camera_name(void) { return NULL; }
+#endif
 
 /* One JPEG from the board's camera as base64, in PSRAM, the caller's to free;
  * or false with a reason. Blocks for the capture, so not on the Link task. */

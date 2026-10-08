@@ -77,3 +77,7 @@ CONFIG_HOMEHUB_PAIRING_AUTO_CONFIRM=y
 # scrambled below its first rows.
 # CONFIG_CAMERA_PSRAM_DMA is not set
 CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX=16384
+
+# Replies in Chinese show as characters, not boxes: Unifont's CJK glyphs,
+# 850 KB of the app slot's 4 MB.
+CONFIG_IMPO_CJK_FONT=y

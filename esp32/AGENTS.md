@@ -436,10 +436,25 @@ The device still needs to be paired once for its token.
 ## Adding a command
 
 Impo calls a gadget's commands by name: the firmware lists them in
-`link.register` and answers each `link.invoke`. A command you add lives in two
-places, which must use the same name. (`device.health` and `device.ota` are
-handled in `noise_control.cpp` itself; everything else goes through
-`on_ws_command()`.)
+`link.register` and answers each `link.invoke`. The vocabulary of commands,
+their parameters and results is [`../CAPABILITIES.md`](../CAPABILITIES.md);
+read it first, and reuse a command that is already there rather than naming a
+new one.
+
+On a board with the full UI the short way is a table entry: a board's own
+commands go in its `impo_board_t.commands` (see `chassis.*` in
+`components/impo/boards/board_espressif_sparkbot.c`), and commands every such
+board shares go in `COMMON` in `components/impo/impo_commands.c`. Each entry is
+the name, the description the agent reads, the `required` and `optional`
+parameter objects as JSON strings, and a `run` function that returns
+`impo_command_ok()` with any result fields added (they are gathered under
+`payload`) or `impo_command_error()`. `run` is called on the Link session's
+task, so it must return at once: start a task for anything slow and report
+through a status command, as `speaker.play_url` and `speaker.status` do.
+
+Otherwise, and for boards without the full UI, a command lives in two places,
+which must use the same name. (`device.health` and `device.ota` are handled in
+`noise_control.cpp` itself; everything else goes through `on_ws_command()`.)
 
 1. **Advertise it** in `build_register_json()` in `main/noise_control.cpp`:
    `add_command(commands, "relay.set", "<description>", required, optional)`.

@@ -1283,6 +1283,9 @@ static char *build_register_json(void) {
     cJSON_AddBoolToObject(params, "is_wakeup_supported", false);
     cJSON *metadata = nullptr;
     add_register_metadata_string(&metadata, params, "network_ssid", wifi_ssid);
+#if CONFIG_IMPO_ENABLED
+    impo_commands_capabilities(params);   // what this gadget has, see CAPABILITIES.md
+#endif
 
     cJSON *commands = cJSON_CreateObject();
     add_command(commands, "device.health",

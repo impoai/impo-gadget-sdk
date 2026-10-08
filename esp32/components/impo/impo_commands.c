@@ -27,6 +27,7 @@
 #include "freertos/task.h"
 #include "impo_audio.h"
 #include "impo_board.h"
+#include "impo_camera.h"
 #include "impo_chat.h"
 #include "impo_settings.h"
 #include "impo_state.h"
@@ -331,6 +332,39 @@ static void describe(cJSON *commands, const impo_command_t *command)
     cJSON_AddItemToObject(entry, "required", required ? required : cJSON_CreateObject());
     cJSON_AddItemToObject(entry, "optional", optional ? optional : cJSON_CreateObject());
     cJSON_AddItemToObject(commands, command->name, entry);
+}
+
+void impo_commands_capabilities(cJSON *params)
+{
+    cJSON *caps = cJSON_AddObjectToObject(params, "capabilities");
+    if (!caps || !impo_board) {
+        return;
+    }
+    cJSON *screen = cJSON_AddObjectToObject(caps, "screen");
+    cJSON_AddNumberToObject(screen, "width", impo_board->width);
+    cJSON_AddNumberToObject(screen, "height", impo_board->height);
+    cJSON_AddBoolToObject(screen, "color", true);
+    cJSON_AddBoolToObject(screen, "round", impo_board->round);
+    cJSON_AddBoolToObject(screen, "touch", impo_board->touch);
+    cJSON_AddBoolToObject(caps, "avatar", true);
+    cJSON_AddBoolToObject(caps, "speaker", impo_board->audio_init != NULL);
+    cJSON_AddBoolToObject(caps, "microphone", impo_board->audio_init != NULL);
+    cJSON_AddBoolToObject(caps, "push_to_talk", impo_board->audio_init != NULL);
+    cJSON_AddBoolToObject(caps, "camera", impo_camera_name() != NULL);
+    cJSON_AddBoolToObject(caps, "battery", impo_board->read_power != NULL);
+    cJSON_AddBoolToObject(caps, "buttons", impo_board->poll_buttons != NULL);
+    cJSON *features = cJSON_AddArrayToObject(caps, "features");
+    const char *list = impo_board->features;
+    while (list && *list) {
+        const char *end = strchr(list, ',');
+        size_t len = end ? (size_t)(end - list) : strlen(list);
+        if (len) {
+            char name[32];
+            snprintf(name, sizeof(name), "%.*s", (int)len, list);
+            cJSON_AddItemToArray(features, cJSON_CreateString(name));
+        }
+        list = end ? end + 1 : list + len;
+    }
 }
 
 void impo_commands_describe(cJSON *commands)

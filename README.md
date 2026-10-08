@@ -63,6 +63,21 @@ prefixed with "ImpoGadget".
 Each directory has a `README.md` to get started and an `AGENTS.md` for coding
 agents like [Muse Code](https://developer.meta.com/ai/lp/muse-code/).
 
+## How it fits together
+
+Three layers, each adapted by different people:
+
+| Layer | Where | Who adapts it |
+|---|---|---|
+| **Boards**: one file per piece of hardware, filling in the board interface (screen, audio, buttons, power, camera, extras) | [`esp32/components/impo/boards/`](esp32/components/impo/boards), [`linux/`](linux) | Whoever has the board, usually with a coding agent reading `AGENTS.md`. The [ESP-SparkBot](esp32/components/impo/boards/board_espressif_sparkbot.c) is the worked example. |
+| **Capabilities**: a fixed vocabulary of commands (`display.*`, `speaker.*`, `camera.*`, `imu.*`, `chassis.*`, `sensors.*`, `device.*`) with their parameters and results, plus a summary of what the gadget has | [`CAPABILITIES.md`](CAPABILITIES.md) | This project. A board registers the capabilities it implements; the agent and the app rely on the contract. |
+| **Ecosystem**: other people's devices on the home network, reached through a gadget's tunnel | [`skills/`](skills), one guide per product | The agent, following the skill; nothing in the firmware knows the product. |
+
+Speech to text, text to speech and seeing pictures are the Impo server's,
+not the gadget's: a gadget sends voice notes and gets spoken replies through
+`gadgets.impo.ai` with its own device token, and no third-party key is ever
+on a gadget.
+
 ## Community
 
 Meet other hackers who are building and customizing Impo gadgets in our
