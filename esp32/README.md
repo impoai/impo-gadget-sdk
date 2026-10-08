@@ -216,11 +216,12 @@ things you can change:
 
 - **Shorter answers.** Ask for them in the message itself, such as "Answer in
   one sentence."
-- **Spoken answers.** Send each reply's text to a text-to-speech API of your
-  choice and play the audio it returns. On boards with PSRAM, `start_tts` in
-  [`components/impo/impo_chat_session.cpp`](components/impo/impo_chat_session.cpp)
-  is the spot: it has the reply text, and the MP3 decoder, speaker and volume
-  are already wired up there.
+- **Spoken answers.** On boards with PSRAM, each reply is spoken: `start_tts`
+  in [`components/impo/impo_chat_session.cpp`](components/impo/impo_chat_session.cpp)
+  asks the gateway for the message's speech (`POST /tts`, answered with a WAV
+  made by Impo's text to speech) and plays it as it arrives, captions
+  following. A reply the gateway can't speak is shown at reading pace. No
+  key for the speech service is on the gadget.
 
 A few things worth knowing:
 
@@ -245,7 +246,8 @@ A few things worth knowing:
 
 ## The ESP-SparkBot's extras
 
-Every gadget with the full UI also offers `speaker.play_url` (an MP3 from a
+Every gadget with the full UI also offers `speaker.say` (a text spoken in
+Impo's voice, through the same `POST /tts`), `speaker.play_url` (an MP3 from a
 public https URL, up to 1.5 MB and about a minute, fetched and decoded on the
 gadget), `speaker.stop` and `speaker.status`. Beyond those, the SparkBot offers its account `chassis.drive`,
 `chassis.move`, `chassis.stop`, `chassis.dance`, `chassis.set_light` and
