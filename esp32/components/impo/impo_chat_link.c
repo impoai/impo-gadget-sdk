@@ -912,6 +912,12 @@ size_t impo_hatch_mp3_selftest(int16_t **pcm)
     return 0;
 }
 
+bool impo_hatch_say(const char *text)
+{
+    (void)text;
+    return false;
+}
+
 size_t impo_hatch_mp3_decode(const uint8_t *mp3, size_t len, int max_seconds, int16_t **pcm)
 {
     (void)mp3;

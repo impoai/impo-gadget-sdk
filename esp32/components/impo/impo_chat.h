@@ -135,6 +135,10 @@ size_t impo_hatch_turn_audio_wait(const int16_t *pcm, size_t frames, int wait_ms
 void impo_hatch_text_turn(char *text);
 void impo_hatch_text_cancel(void);
 
+/* Speaks `text` through the gateway's text to speech, outside any turn (speaker.say).
+ * False when Hatch isn't set up or is busy; the speech itself may still fail later. */
+bool impo_hatch_say(const char *text);
+
 /*
  * Prints one "@chat" line per call (more if `text` is long): the type, then the
  * printf-style `fields` (JSON members, or NULL), then `text` escaped (or none).

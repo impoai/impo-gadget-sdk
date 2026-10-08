@@ -38,6 +38,7 @@ static const char *TAG = "impo_commands";
 #define SOUND_MAX_BYTES (1536 * 1024)   /* an MP3 of a minute at 192 kbps */
 #define SOUND_MAX_SECONDS 60
 #define SOUND_TIMEOUT_MS 15000
+#define SAY_MAX_CHARS 1000
 
 cJSON *impo_command_ok(void)
 {
@@ -247,6 +248,25 @@ static cJSON *play_url(const cJSON *params)
     return result;
 }
 
+static cJSON *speaker_say(const cJSON *params)
+{
+    const cJSON *text = cJSON_GetObjectItem(params, "text");
+    if (!cJSON_IsString(text) || !text->valuestring[0] || strlen(text->valuestring) > SAY_MAX_CHARS) {
+        return impo_command_error("invalid_param", "text must be 1 to 1000 characters");
+    }
+    if (!impo_settings_speaker_on()) {
+        return impo_command_error("speaker_off", "the speaker is turned off in the gadget's settings");
+    }
+    if (!impo_hatch_say(text->valuestring)) {
+        return impo_command_error("unavailable", "the gadget is not connected to Impo's voice");
+    }
+    impo_state_poke();
+    cJSON *result = impo_command_ok();
+    cJSON_AddStringToObject(result, "status", "fetching");
+    cJSON_AddStringToObject(result, "note", "the speech plays once Impo has made it, a few seconds from now");
+    return result;
+}
+
 static cJSON *speaker_stop(const cJSON *params)
 {
     (void)params;
@@ -290,7 +310,12 @@ static const impo_command_t COMMON[] = {
       "must be reachable without a login. Returns at once; the sound starts a few seconds later.",
       "{\"url\":{\"type\":\"string\",\"description\":\"https URL of an MP3 file, up to 1.5 MB.\"}}",
       NULL, play_url },
-    { "speaker.stop", "Stop the sound speaker.play_url is playing.", NULL, NULL, speaker_stop },
+    { "speaker.say",
+      "Say something out loud on the gadget's speaker, in Impo's voice: a sentence or two for the "
+      "person next to it. Returns at once; the speech starts a few seconds later.",
+      "{\"text\":{\"type\":\"string\",\"description\":\"What to say, 1 to 1000 characters, any language.\"}}",
+      NULL, speaker_say },
+    { "speaker.stop", "Stop the sound speaker.say or speaker.play_url is playing.", NULL, NULL, speaker_stop },
     { "speaker.status",
       "Whether the speaker is on, its volume, and what became of the last speaker.play_url: "
       "fetching, decoding, playing, idle or failed (with the reason).",
