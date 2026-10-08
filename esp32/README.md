@@ -245,7 +245,9 @@ A few things worth knowing:
 
 ## The ESP-SparkBot's extras
 
-Beyond the common commands, the SparkBot offers its account `chassis.drive`,
+Every gadget with the full UI also offers `speaker.play_url` (an MP3 from a
+public https URL, up to 1.5 MB and about a minute, fetched and decoded on the
+gadget), `speaker.stop` and `speaker.status`. Beyond those, the SparkBot offers its account `chassis.drive`,
 `chassis.move`, `chassis.stop`, `chassis.dance`, `chassis.set_light` and
 `chassis.status` for the optional tracked base, `imu.read` for its motion
 sensor and `camera.capture` for its camera. The base stops itself half a

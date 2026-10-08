@@ -73,6 +73,9 @@ static volatile float s_monitor_db = -100.0f;
 static volatile bool s_chirp;
 static volatile bool s_loopback;
 static volatile bool s_mp3test;
+static int16_t *s_play;          /* a sound to play, 16 kHz mono, ours to free (impo_voice_play) */
+static size_t s_play_n;
+static volatile bool s_play_stop;
 
 /*
  * Pre-roll: while idle the mic keeps running into this ring, so a recording
@@ -791,7 +794,7 @@ static void voice_task(void *arg)
             impo_input_event_t ev;
             bool asleep = impo_state_asleep();
             bool battery = impo_state_on_battery();
-            bool rest = asleep && battery && !s_chirp && !s_mp3test && !s_loopback;
+            bool rest = asleep && battery && !s_chirp && !s_mp3test && !s_loopback && !s_play;
 #if HOLD_NOTES
             /* A press goes first: send_held() leaves it queued and returns
              * without backing off, so retrying before it's read would spin. */
@@ -829,6 +832,20 @@ static void voice_task(void *arg)
                 size_t n = impo_hatch_mp3_selftest(&pcm);
                 for (size_t i = 0; i < n; i += IMPO_AUDIO_CHUNK) {
                     impo_audio_write(pcm + i, n - i < IMPO_AUDIO_CHUNK ? n - i : IMPO_AUDIO_CHUNK);
+                }
+                free(pcm);
+                pre_reset();
+            }
+            if (s_play) {
+                /* A chunk at a time, so a stop or a new sound is noticed within 20 ms. */
+                int16_t *pcm = s_play;
+                size_t n = s_play_n;
+                s_play_stop = false;
+                for (size_t i = 0; i < n && !s_play_stop && pcm == s_play; i += IMPO_AUDIO_CHUNK) {
+                    impo_audio_write(pcm + i, n - i < IMPO_AUDIO_CHUNK ? n - i : IMPO_AUDIO_CHUNK);
+                }
+                if (pcm == s_play) {
+                    s_play = NULL;
                 }
                 free(pcm);
                 pre_reset();
@@ -926,6 +943,24 @@ void impo_voice_request_mp3test(void)
 {
     s_mp3test = true;
     impo_state_nudge();
+}
+
+void impo_voice_play(int16_t *pcm, size_t n)
+{
+    s_play_stop = true;   /* whatever was playing stops; the loop frees it */
+    s_play_n = n;
+    s_play = pcm;
+    impo_state_nudge();
+}
+
+void impo_voice_stop(void)
+{
+    s_play_stop = true;
+}
+
+bool impo_voice_playing(void)
+{
+    return s_play != NULL;
 }
 
 bool impo_voice_resting(void)

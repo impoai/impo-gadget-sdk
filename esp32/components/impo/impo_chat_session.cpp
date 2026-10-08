@@ -2168,15 +2168,12 @@ extern "C" size_t impo_hatch_turn_read(int16_t *pcm, size_t frames, int wait_ms)
     return xStreamBufferReceive(s_out, pcm, frames * sizeof(int16_t), pdMS_TO_TICKS(wait_ms)) / sizeof(int16_t);
 }
 
-/* Bench test: decodes the embedded test_reply.mp3 exactly as a reply is decoded. */
-static size_t mp3_selftest(int16_t **pcm_out)
+/* Decodes a whole MP3 to 16 kHz mono, up to max_seconds of it, exactly as a reply is decoded. */
+static size_t mp3_decode(const uint8_t *mp3_start, size_t len, int max_seconds, int16_t **pcm_out)
 {
-    extern const uint8_t mp3_start[] asm("_binary_test_reply_mp3_start");
-    extern const uint8_t mp3_end[] asm("_binary_test_reply_mp3_end");
-    size_t len = mp3_end - mp3_start;
     mp3dec_t *dec = (mp3dec_t *)psram_alloc(sizeof(mp3dec_t));
     int16_t *pcm = (int16_t *)psram_alloc(MINIMP3_MAX_SAMPLES_PER_FRAME * sizeof(int16_t));
-    size_t cap = MIC_RATE * 10;
+    size_t cap = (size_t)MIC_RATE * max_seconds;
     int16_t *out = (int16_t *)psram_alloc(cap * sizeof(int16_t));
     if (!dec || !pcm || !out) {
         free(dec);
@@ -2214,37 +2211,53 @@ static size_t mp3_selftest(int16_t **pcm_out)
         }
         n += resample(&rs, pcm, samples, out + n);
     }
-    ESP_LOGI(TAG, "mp3 selftest: %u bytes, %d frames at %d Hz -> %u samples (%.2f s) in %lld ms",
+    ESP_LOGI(TAG, "mp3: %u bytes, %d frames at %d Hz -> %u samples (%.2f s) in %lld ms",
              (unsigned)len, frames, rate, (unsigned)n, n / (double)MIC_RATE, (now_us() - t0) / 1000);
     free(dec);
     free(pcm);
+    if (!n) {
+        free(out);
+        out = nullptr;
+    }
     *pcm_out = out;
     return n;
 }
 
-struct selftest_t {
+struct decode_t {
     TaskHandle_t caller;
+    const uint8_t *mp3;
+    size_t len;
+    int max_seconds;
     int16_t *pcm;
     size_t n;
 };
 
-/* minimp3 wants ~16 KB of stack, more than the voice task has. */
-extern "C" size_t impo_hatch_mp3_selftest(int16_t **pcm_out)
+/* minimp3 wants ~16 KB of stack, more than the voice or Link tasks have. */
+extern "C" size_t impo_hatch_mp3_decode(const uint8_t *mp3, size_t len, int max_seconds, int16_t **pcm_out)
 {
-    selftest_t st = { xTaskGetCurrentTaskHandle(), nullptr, 0 };
+    decode_t st = { xTaskGetCurrentTaskHandle(), mp3, len, max_seconds, nullptr, 0 };
     auto body = [](void *arg) {
-        auto *st = (selftest_t *)arg;
-        st->n = mp3_selftest(&st->pcm);
+        auto *st = (decode_t *)arg;
+        st->n = mp3_decode(st->mp3, st->len, st->max_seconds, &st->pcm);
         xTaskNotifyGive(st->caller);
         vTaskSuspend(NULL);   /* the caller deletes it, which frees the PSRAM stack */
     };
     TaskHandle_t task;
-    if (xTaskCreatePinnedToCoreWithCaps(body, "mp3_selftest", 32 * 1024, &st, 5, &task, 0,
+    if (xTaskCreatePinnedToCoreWithCaps(body, "mp3_decode", 32 * 1024, &st, 5, &task, 0,
                                         MALLOC_CAP_SPIRAM) != pdPASS) {
+        *pcm_out = nullptr;
         return 0;
     }
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     vTaskDeleteWithCaps(task);
     *pcm_out = st.pcm;
     return st.n;
+}
+
+/* Bench test: the embedded test_reply.mp3. */
+extern "C" size_t impo_hatch_mp3_selftest(int16_t **pcm_out)
+{
+    extern const uint8_t mp3_start[] asm("_binary_test_reply_mp3_start");
+    extern const uint8_t mp3_end[] asm("_binary_test_reply_mp3_end");
+    return impo_hatch_mp3_decode(mp3_start, mp3_end - mp3_start, 10, pcm_out);
 }
