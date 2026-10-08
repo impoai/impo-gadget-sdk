@@ -47,6 +47,11 @@ extern "C" {
 #include "impo_state.h"
 }
 #endif
+#if CONFIG_IMPO_CAMERA
+extern "C" {
+#include "impo_camera.h"
+}
+#endif
 }
 
 #include <xplat/noise/core/ClientSession.h>
@@ -1372,13 +1377,16 @@ static char *build_register_json(void) {
                 nullptr, nullptr);
 #endif
 
-#if CONFIG_IMPO_WATCHER_CAMERA
-    add_command(commands, "camera.capture",
-                "Capture one still JPEG frame from the SenseCAP Watcher camera. "
-                "The frame is returned as base64 only when this command is explicitly invoked.",
-                nullptr, nullptr);
-    cJSON_AddNumberToObject(
-        cJSON_GetObjectItem(commands, "camera.capture"), "timeout_ms", 30000);
+#if CONFIG_IMPO_CAMERA
+    if (const char *camera = impo_camera_name()) {
+        char description[200];
+        snprintf(description, sizeof(description),
+                 "Take one photo with the gadget's camera (%s) of whatever is in front of it, "
+                 "as a JPEG. Returned only when this command is explicitly invoked.", camera);
+        add_command(commands, "camera.capture", description, nullptr, nullptr);
+        cJSON_AddNumberToObject(
+            cJSON_GetObjectItem(commands, "camera.capture"), "timeout_ms", 30000);
+    }
 #endif
 
     if (ota_is_enabled()) {

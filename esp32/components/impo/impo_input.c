@@ -43,6 +43,9 @@
 #include "impo_ui.h"
 #include "impo_voice.h"
 #include "impo_wifi.h"
+#if CONFIG_IMPO_BOARD_ESPRESSIF_SPARKBOT
+#include "boards/sparkbot_console.h"
+#endif
 #if CONFIG_IMPO_WATCHER_CAMERA
 #include "boards/watcher_camera.h"
 #endif
@@ -570,6 +573,11 @@ static void set_face(const char *name)
  */
 static bool console_command(char *line, bool whole)
 {
+#if CONFIG_IMPO_BOARD_ESPRESSIF_SPARKBOT
+    if (impo_sparkbot_console(line, whole)) {
+        return true;
+    }
+#endif
     if (!strcmp(line, "status")) {
         size_t cap = 1024;   /* long SSID, host and VM names escaped: past 512 */
         char *json = heap_caps_malloc(cap, IMPO_BIG_CAPS);

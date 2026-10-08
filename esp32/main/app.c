@@ -30,7 +30,7 @@
 #include "cJSON.h"
 
 #include "esp_heap_caps.h"
-#if CONFIG_IMPO_WATCHER_CAMERA
+#if CONFIG_IMPO_CAMERA
 #include "freertos/idf_additions.h"
 #endif
 #include "esp_timer.h"
@@ -68,8 +68,8 @@
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS
 #include "sensecap_sensors.h"
 #endif
-#if CONFIG_IMPO_WATCHER_CAMERA
-#include "boards/watcher_camera.h"
+#if CONFIG_IMPO_CAMERA
+#include "impo_camera.h"
 #endif
 #if CONFIG_IMPO_ENABLED
 #include "impo_commands.h"
@@ -1546,18 +1546,18 @@ static void draw_url_done(const image_fetch_result_t *r, void *user) {
 }
 #endif
 
-#if CONFIG_IMPO_WATCHER_CAMERA
+#if CONFIG_IMPO_CAMERA
 typedef struct {
     noise_ctrl_session_generation_t session_generation;
     char request_id[64];
-} watcher_camera_task_args_t;
+} camera_task_args_t;
 
-static void watcher_camera_capture_task(void *arg) {
-    watcher_camera_task_args_t *args = arg;
+static void camera_capture_task(void *arg) {
+    camera_task_args_t *args = arg;
     char *image = NULL;
     const char *error = NULL;
     cJSON *result = cJSON_CreateObject();
-    bool ok = watcher_camera_capture(&image, &error);
+    bool ok = impo_camera_capture(&image, &error);
     cJSON_AddBoolToObject(result, "ok", ok);
     if (ok) {
         cJSON *payload = cJSON_AddObjectToObject(result, "payload");
@@ -1870,13 +1870,14 @@ static cJSON *on_ws_command(
         return result;
     }
 #endif
-#if CONFIG_IMPO_WATCHER_CAMERA
+#if CONFIG_IMPO_CAMERA
     if (strcmp(command, "camera.capture") == 0) {
-        watcher_camera_task_args_t *args = calloc(1, sizeof(*args));
+        if (!impo_camera_name()) return command_error("unsupported", "this gadget has no camera");
+        camera_task_args_t *args = calloc(1, sizeof(*args));
         if (!args) return command_error("out_of_memory", "failed to allocate camera request");
         args->session_generation = session_generation;
         strncpy(args->request_id, request_id, sizeof(args->request_id) - 1);
-        if (xTaskCreateWithCaps(watcher_camera_capture_task, "camera_capture", 8192,
+        if (xTaskCreateWithCaps(camera_capture_task, "camera_capture", 8192,
                                 args, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
             free(args);
             return command_error("out_of_memory", "failed to start camera capture");

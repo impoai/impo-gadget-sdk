@@ -66,7 +66,7 @@ if(CONFIG_IMPO_ENABLED)
     elseif(CONFIG_IMPO_BOARD_AIPI)
         list(APPEND srcs "boards/board_aipi.c")
     elseif(CONFIG_IMPO_BOARD_ESPRESSIF_SPARKBOT)
-        list(APPEND srcs "boards/board_espressif_sparkbot.c")
+        list(APPEND srcs "boards/board_espressif_sparkbot.c" "boards/sparkbot_imu.c" "boards/sparkbot_touch.c")
     elseif(CONFIG_IMPO_BOARD_ESPRESSIF_BOX_3)
         list(APPEND srcs "boards/board_espressif_box_3.c" "boards/box_3_microphone.c")
     elseif(CONFIG_IMPO_BOARD_WAVESHARE_C6_18)
@@ -100,7 +100,12 @@ set(impo_priv_requires
     noise_core minimp3
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
     esp_driver_pcnt)
-list(APPEND impo_priv_requires camera)
+# Requirements can't follow CONFIG_ here (they're read before the config is):
+# the SparkBot's IMU driver and the touch pads are listed for every board.
+list(APPEND impo_priv_requires camera bmi270 esp_driver_touch_sens)
+if(CONFIG_IMPO_CAMERA)
+    list(APPEND srcs "impo_camera.c")
+endif()
 
 idf_component_register(
     SRCS ${srcs}

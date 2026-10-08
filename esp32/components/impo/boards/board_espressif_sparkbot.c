@@ -16,20 +16,32 @@
 
 /*
  * Espressif ESP-SparkBot: ESP32-S3 with 8 MB PSRAM and 16 MB flash, a 240 px
- * ST7789 LCD (no touch), an ES8311 codec with one mic, and the BOOT button.
+ * ST7789 LCD (no touch screen), an ES8311 codec with one mic, an OV2640
+ * camera, a BMI270 motion sensor, three capacitive pads and the BOOT button.
  * Pins follow xiaozhi-esp32's board, main/boards/espressif/esp-sparkbot
- * (config.h and esp_sparkbot_board.cc). GPIO46 is both the backlight and the
- * amplifier enable, so it is only ever on or off, never dimmed, and the codec
- * is not given the pin. The optional tracked base listens on UART1 for the
- * drive, dance and light commands its own firmware defines. The camera, touch
- * pads and battery are not used.
+ * (config.h and esp_sparkbot_board.cc), and the vendor's factory demo for
+ * the rest. GPIO46 is both the backlight and the amplifier enable, so it is
+ * only ever on or off, never dimmed, and the codec is not given the pin.
+ *
+ * The top pad is the talk button, the side pads the aux button; BOOT, hidden
+ * under the shell, is the talk button too. The optional tracked base listens
+ * on UART1 for the drive, dance and light commands its own firmware defines,
+ * and stops itself half a second after the last one, so a drive is kept up
+ * by a task here that repeats it until its time is over.
  */
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "driver/i2c_master.h"
 #include "driver/i2s_std.h"
 #include "driver/spi_master.h"
 #include "driver/uart.h"
+#include "driver/usb_serial_jtag.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
+#include "esp_adc/adc_oneshot.h"
 #include "esp_check.h"
 #include "esp_codec_dev_defaults.h"
 #include "esp_lcd_panel_io.h"
@@ -38,12 +50,21 @@
 #include "esp_log.h"
 #include "esp_lv_adapter.h"
 #include "esp_sleep.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
+#include "camera.h"
+#include "camera_dvp.h"
 #include "impo_audio.h"
 #include "impo_board.h"
+#include "impo_camera.h"
 #include "impo_mem.h"
+#include "sparkbot_console.h"
+#include "sparkbot_imu.h"
+#include "sparkbot_touch.h"
 
 static const char *TAG = "board";
 
@@ -65,14 +86,49 @@ static const char *TAG = "board";
 #define I2S_DOUT GPIO_NUM_42
 
 #define TALK_GPIO GPIO_NUM_0        /* BOOT */
+#define TOUCH_WAIT_MS 150           /* asleep, how often the pads are looked at */
+
+#define CAM_XCLK GPIO_NUM_15
+#define CAM_PCLK GPIO_NUM_13
+#define CAM_VSYNC GPIO_NUM_6
+#define CAM_HREF GPIO_NUM_7
+#define CAM_DATA { GPIO_NUM_11, GPIO_NUM_9, GPIO_NUM_8, GPIO_NUM_10, GPIO_NUM_12, GPIO_NUM_18, GPIO_NUM_17, GPIO_NUM_16 }
+
+/* Battery through a 100k/100k divider on GPIO14; the factory demo's meter. */
+#define BATT_ADC_UNIT ADC_UNIT_2
+#define BATT_ADC ADC_CHANNEL_3
+#define BATT_EMPTY_MV 3100
+#define BATT_FULL_MV 4200
+#define BATT_ABSENT_MV 2500         /* below this nothing is connected */
 
 #define BASE_UART UART_NUM_1         /* the tracked base, when one is attached */
 #define BASE_TX GPIO_NUM_38
 #define BASE_RX GPIO_NUM_48
+#define BASE_TICK_MS 200             /* repeat a drive this often; the base stops after 500 */
+#define BASE_STEP_MS 500             /* one "step" */
+#define BASE_MAX_MS 10000
 
 static i2c_master_bus_handle_t s_i2c;
 static esp_lcd_panel_handle_t s_panel;
 static impo_gpio_button_t s_talk;
+static unsigned s_touch;             /* pads down at the last poll */
+static adc_oneshot_unit_handle_t s_adc;
+static adc_cali_handle_t s_adc_cali;
+static bool s_imu_ok;
+
+/* The base: what it was last told, how long to keep saying it, and whether
+ * it has echoed anything back lately. All under s_base_lock. */
+static SemaphoreHandle_t s_base_lock;
+static struct {
+    float x, y;
+    TickType_t until;
+    bool moving;            /* a non-zero drive was sent and no stop since */
+    bool ever_sent;
+    TickType_t asked;       /* the first send since the base last echoed */
+    bool answered;          /* an echo has come since `asked` */
+} s_base;
+
+static void base_task(void *arg);
 
 static esp_err_t init(void)
 {
@@ -96,7 +152,40 @@ static esp_err_t init(void)
     ESP_RETURN_ON_ERROR(uart_driver_install(BASE_UART, 2048, 0, 0, NULL, 0), TAG, "base uart");
     ESP_RETURN_ON_ERROR(uart_param_config(BASE_UART, &base_cfg), TAG, "base uart config");
     ESP_RETURN_ON_ERROR(uart_set_pin(BASE_UART, BASE_TX, BASE_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE), TAG, "base uart pins");
-    return impo_gpio_button_init(&s_talk, TALK_GPIO);
+    s_base_lock = xSemaphoreCreateMutex();
+    if (!s_base_lock) {
+        return ESP_ERR_NO_MEM;
+    }
+    ESP_RETURN_ON_ERROR(impo_gpio_button_init(&s_talk, TALK_GPIO), TAG, "boot button");
+    /* Without the pads BOOT still talks; without the IMU its command says so. */
+    esp_err_t err = sparkbot_touch_init();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "touch pads: %s", esp_err_to_name(err));
+    }
+    s_imu_ok = sparkbot_imu_init(s_i2c) == ESP_OK;
+
+    const adc_oneshot_unit_init_cfg_t adc_cfg = { .unit_id = BATT_ADC_UNIT };
+    ESP_RETURN_ON_ERROR(adc_oneshot_new_unit(&adc_cfg, &s_adc), TAG, "adc");
+    const adc_oneshot_chan_cfg_t ch_cfg = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
+    ESP_RETURN_ON_ERROR(adc_oneshot_config_channel(s_adc, BATT_ADC, &ch_cfg), TAG, "adc channel");
+    const adc_cali_curve_fitting_config_t cali_cfg = {
+        .unit_id = BATT_ADC_UNIT, .chan = BATT_ADC, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12,
+    };
+    if (adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali) != ESP_OK) {
+        s_adc_cali = NULL;   /* raw counts then, see read_power */
+    }
+
+    const camera_dvp_config_t cam = {
+        .name = "ESP-SparkBot camera",
+        .xclk = CAM_XCLK, .pclk = CAM_PCLK, .vsync = CAM_VSYNC, .href = CAM_HREF,
+        .d = CAM_DATA,
+        .i2c_port = I2C_NUM_0,
+        .vflip = true,
+    };
+    camera_register(camera_dvp(&cam));
+
+    BaseType_t ok = xTaskCreatePinnedToCore(base_task, "base", 3072, NULL, 5, NULL, tskNO_AFFINITY);
+    return ok == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
 static lv_display_t *display_start(lv_indev_t **touch)
@@ -248,14 +337,60 @@ static esp_err_t audio_init(esp_codec_dev_handle_t *spk, esp_codec_dev_handle_t 
     return *spk && *mic ? ESP_OK : ESP_FAIL;
 }
 
+/* BOOT and the top pad both talk; the side pads are the aux button. */
 static unsigned poll_buttons(void)
 {
-    return impo_gpio_button_poll(&s_talk);
+    unsigned ev = impo_gpio_button_poll(&s_talk);
+    unsigned now = sparkbot_touch_state();
+    unsigned was = s_touch;
+    s_touch = now;
+    bool top_now = now & SPARKBOT_TOUCH_TOP, top_was = was & SPARKBOT_TOUCH_TOP;
+    bool side_now = now & (SPARKBOT_TOUCH_LEFT | SPARKBOT_TOUCH_RIGHT);
+    bool side_was = was & (SPARKBOT_TOUCH_LEFT | SPARKBOT_TOUCH_RIGHT);
+    if (top_now != top_was) {
+        ev |= top_now ? IMPO_BTN_TALK_PRESS : IMPO_BTN_TALK_RELEASE;
+    }
+    if (side_now != side_was) {
+        ev |= side_now ? IMPO_BTN_AUX_PRESS : IMPO_BTN_AUX_RELEASE;
+    }
+    return ev;
 }
 
+/* BOOT interrupts; the pads are looked at between short sleeps. */
 static void wait_buttons(int timeout_ms)
 {
-    impo_gpio_buttons_wait((impo_gpio_button_t *const[]){ &s_talk }, 1, timeout_ms);
+    if (sparkbot_touch_state() != s_touch) {
+        return;
+    }
+    impo_gpio_buttons_wait((impo_gpio_button_t *const[]){ &s_talk }, 1,
+                           timeout_ms < TOUCH_WAIT_MS ? timeout_ms : TOUCH_WAIT_MS);
+}
+
+static esp_err_t read_power(impo_power_t *out)
+{
+    int sum = 0;
+    for (int i = 0; i < 4; i++) {
+        int v;
+        ESP_RETURN_ON_ERROR(adc_oneshot_read(s_adc, BATT_ADC, &v), TAG, "adc read");
+        sum += v;
+    }
+    int raw = sum / 4, mv = 0;
+    if (s_adc_cali) {
+        ESP_RETURN_ON_ERROR(adc_cali_raw_to_voltage(s_adc_cali, raw, &mv), TAG, "adc cali");
+    } else {
+        mv = raw * 3100 / 4095;   /* 12 dB attenuation, roughly */
+    }
+    mv *= 2;   /* the divider */
+    out->usb = usb_serial_jtag_is_connected();
+    out->charging = false;   /* the charger's status line isn't on a pin */
+    out->battery_mv = mv;
+    if (mv < BATT_ABSENT_MV) {
+        out->battery_pct = -1;
+        return ESP_OK;
+    }
+    int pct = (mv - BATT_EMPTY_MV) * 100 / (BATT_FULL_MV - BATT_EMPTY_MV);
+    out->battery_pct = pct < 0 ? 0 : pct > 100 ? 100 : pct;
+    return ESP_OK;
 }
 
 /* There is no power latch to open: sleep until BOOT is pressed. */
@@ -271,58 +406,387 @@ static esp_err_t power_off(void)
     return ESP_FAIL;
 }
 
-/*
- * The tracked base takes short text commands; nothing comes back, so these
- * report that the command was sent, not that the base moved. Strings follow
- * xiaozhi-esp32's esp-sparkbot board.
- */
-static cJSON *base_send(const char *text)
+static void snap_task(void *arg)
 {
-    uart_write_bytes(BASE_UART, text, strlen(text));
+    char *jpeg = NULL;
+    const char *error = NULL;
+    int64_t started = esp_timer_get_time();
+    if (impo_camera_capture(&jpeg, &error)) {
+        int64_t captured = esp_timer_get_time();
+        printf("@snap {\"jpeg_base64\":\"%s\"}\n", jpeg);
+        fflush(stdout);
+        ESP_LOGI(TAG, "snap: capture %lld ms, output %lld ms", (long long)((captured - started) / 1000),
+                 (long long)((esp_timer_get_time() - captured) / 1000));
+    } else {
+        printf("@snap {\"error\":\"%s\"}\n", error);
+    }
+    free(jpeg);
+    fflush(stdout);
+    xTaskNotifyGive((TaskHandle_t)arg);
+    vTaskDeleteWithCaps(NULL);
+}
+
+/* ">snap": one photo as base64, for tools/impo/photo.py, on a task with room
+ * for the sensor driver and the JPEG encoder, which the serial task hasn't. */
+static void console_snap(void)
+{
+    TaskHandle_t waiter = xTaskGetCurrentTaskHandle();
+    if (xTaskCreateWithCaps(snap_task, "snap", 8192, waiter, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS) {
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(30000));
+    } else {
+        printf("@snap {\"error\":\"out of memory\"}\n");
+        fflush(stdout);
+    }
+}
+
+/* With s_base_lock held: notes any echo the base sent since the last look.
+ * The base's firmware echoes every byte. */
+static void base_listen(void)
+{
+    size_t waiting = 0;
+    if (uart_get_buffered_data_len(BASE_UART, &waiting) == ESP_OK && waiting > 0) {
+        uart_flush_input(BASE_UART);
+        s_base.answered = true;
+    }
+}
+
+/* With s_base_lock held: one line to the base. */
+static bool base_write(const char *text)
+{
+    base_listen();
+    if (!s_base.ever_sent || s_base.answered) {
+        s_base.asked = xTaskGetTickCount();
+    }
+    s_base.ever_sent = true;
+    s_base.answered = false;
+    return uart_write_bytes(BASE_UART, text, strlen(text)) == (int)strlen(text);
+}
+
+static bool base_write_drive(float x, float y)
+{
+    char text[32];
+    snprintf(text, sizeof(text), "x%.2f y%.2f", x, y);
+    return base_write(text);
+}
+
+/* Keeps a drive going until its time is up, then stops the base once. */
+static void base_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(BASE_TICK_MS));
+        if (xSemaphoreTake(s_base_lock, pdMS_TO_TICKS(50)) != pdTRUE) {
+            continue;
+        }
+        TickType_t now = xTaskGetTickCount();
+        if ((int32_t)(s_base.until - now) > 0) {
+            base_write_drive(s_base.x, s_base.y);
+        } else if (s_base.moving) {
+            base_write_drive(0, 0);
+            s_base.moving = false;
+        }
+        xSemaphoreGive(s_base_lock);
+    }
+}
+
+/* With the lock held: "responding" (what was last sent was echoed), "silent"
+ * (sent to, nothing back) or "unknown" (nothing sent yet, or the echo isn't
+ * due). */
+static const char *base_presence(void)
+{
+    base_listen();
+    if (!s_base.ever_sent) {
+        return "unknown";
+    }
+    if (s_base.answered) {
+        return "responding";
+    }
+    if (xTaskGetTickCount() - s_base.asked < pdMS_TO_TICKS(BASE_TICK_MS)) {
+        return "unknown";
+    }
+    return "silent";
+}
+
+/* The result of a command that spoke to the base. */
+static cJSON *base_result(bool sent)
+{
+    if (!sent) {
+        return impo_command_error("uart_error", "the base command could not be transmitted");
+    }
     cJSON *result = impo_command_ok();
-    cJSON_AddStringToObject(result, "note", "sent to the base; the gadget cannot tell whether a base is attached");
+    cJSON_AddStringToObject(result, "base", base_presence());
+    cJSON_AddBoolToObject(result, "moving", s_base.moving);
     return result;
+}
+
+static cJSON *base_busy(void)
+{
+    return impo_command_error("busy", "a local base diagnostic is running");
+}
+
+/* A drive for `ms`: the task repeats it and stops the base afterwards. */
+static cJSON *base_drive(float x, float y, int ms)
+{
+    if (xSemaphoreTake(s_base_lock, pdMS_TO_TICKS(20)) != pdTRUE) {
+        return base_busy();
+    }
+    bool stop = x == 0 && y == 0;
+    s_base.x = x;
+    s_base.y = y;
+    s_base.until = stop ? 0 : xTaskGetTickCount() + pdMS_TO_TICKS(ms);
+    bool sent = base_write_drive(x, y);
+    s_base.moving = !stop;
+    cJSON *result = base_result(sent);
+    xSemaphoreGive(s_base_lock);
+    return result;
+}
+
+static cJSON *base_say(const char *text)
+{
+    if (xSemaphoreTake(s_base_lock, pdMS_TO_TICKS(20)) != pdTRUE) {
+        return base_busy();
+    }
+    cJSON *result = base_result(base_write(text));
+    xSemaphoreGive(s_base_lock);
+    return result;
+}
+
+static int duration_param(const cJSON *params, int fallback)
+{
+    const cJSON *ms = cJSON_GetObjectItem(params, "duration_ms");
+    if (!cJSON_IsNumber(ms)) {
+        return fallback;
+    }
+    return ms->valueint < 0 ? -1 : ms->valueint > BASE_MAX_MS ? BASE_MAX_MS : ms->valueint;
+}
+
+static bool axis_param(const cJSON *params, const char *name, float *out)
+{
+    const cJSON *v = cJSON_GetObjectItem(params, name);
+    if (!v) {
+        *out = 0;
+        return true;
+    }
+    if (!cJSON_IsNumber(v) || v->valuedouble < -1 || v->valuedouble > 1) {
+        return false;
+    }
+    *out = (float)v->valuedouble;
+    return true;
+}
+
+static cJSON *chassis_drive(const cJSON *params)
+{
+    float x, y;
+    if (!axis_param(params, "turn", &x) || !axis_param(params, "forward", &y)) {
+        return impo_command_error("invalid_param", "forward and turn must be -1 to 1");
+    }
+    int ms = duration_param(params, BASE_STEP_MS);
+    if (ms < 0) {
+        return impo_command_error("invalid_param", "duration_ms must be 0 to 10000");
+    }
+    return base_drive(x, y, ms);
 }
 
 static cJSON *chassis_move(const cJSON *params)
 {
     static const struct {
-        const char *direction, *text;
-    } moves[] = { { "forward", "x0.0 y1.0" }, { "back", "x0.0 y-1.0" }, { "left", "x-1.0 y0.0" },
-                  { "right", "x1.0 y0.0" }, { "stop", "x0.0 y0.0" } };
+        const char *direction;
+        float x, y;
+    } moves[] = { { "forward", 0, 1 }, { "back", 0, -1 }, { "left", -1, 0 }, { "right", 1, 0 }, { "stop", 0, 0 } };
     const char *direction = cJSON_GetStringValue(cJSON_GetObjectItem(params, "direction"));
+    int ms = duration_param(params, BASE_STEP_MS);
+    if (ms < 0) {
+        return impo_command_error("invalid_param", "duration_ms must be 0 to 10000");
+    }
     for (size_t i = 0; direction && i < sizeof(moves) / sizeof(moves[0]); i++) {
         if (!strcmp(direction, moves[i].direction)) {
-            return base_send(moves[i].text);
+            return base_drive(moves[i].x, moves[i].y, ms);
         }
     }
     return impo_command_error("invalid_param", "direction must be forward, back, left, right or stop");
 }
 
+static cJSON *chassis_stop(const cJSON *params)
+{
+    (void)params;
+    return base_drive(0, 0, 0);
+}
+
 static cJSON *chassis_dance(const cJSON *params)
 {
     (void)params;
-    return base_send("d1");
+    return base_say("d1");
 }
 
+/* The base's light_mode_t, by name; its first two are its own charging states. */
 static cJSON *chassis_light(const cJSON *params)
 {
-    const cJSON *mode = cJSON_GetObjectItem(params, "mode");
-    if (!cJSON_IsNumber(mode) || mode->valueint < 1 || mode->valueint > 6) {
-        return impo_command_error("invalid_param", "mode must be 1 to 6");
+    static const struct {
+        const char *effect;
+        int mode;
+    } effects[] = { { "on", 2 }, { "blink", 3 }, { "breathe_slow", 4 }, { "breathe_fast", 5 },
+                    { "flowing", 6 }, { "show", 7 }, { "off", 8 } };
+    const char *effect = cJSON_GetStringValue(cJSON_GetObjectItem(params, "effect"));
+    for (size_t i = 0; effect && i < sizeof(effects) / sizeof(effects[0]); i++) {
+        if (!strcmp(effect, effects[i].effect)) {
+            char text[8];
+            snprintf(text, sizeof(text), "w%d", effects[i].mode);
+            return base_say(text);
+        }
     }
-    const char text[] = { 'w', (char)('0' + mode->valueint + 2), '\0' };
-    return base_send(text);
+    return impo_command_error("invalid_param", "effect must be on, blink, breathe_slow, breathe_fast, flowing, show or off");
+}
+
+static cJSON *chassis_status(const cJSON *params)
+{
+    (void)params;
+    if (xSemaphoreTake(s_base_lock, pdMS_TO_TICKS(20)) != pdTRUE) {
+        return base_busy();
+    }
+    cJSON *result = impo_command_ok();
+    cJSON_AddStringToObject(result, "base", base_presence());
+    cJSON_AddBoolToObject(result, "moving", s_base.moving);
+    xSemaphoreGive(s_base_lock);
+    return result;
+}
+
+static cJSON *imu_read(const cJSON *params)
+{
+    (void)params;
+    sparkbot_imu_reading_t r;
+    if (!s_imu_ok) {
+        return impo_command_error("unavailable", "the motion sensor did not start");
+    }
+    esp_err_t err = sparkbot_imu_read(&r);
+    if (err != ESP_OK) {
+        return impo_command_error("sensor_error", esp_err_to_name(err));
+    }
+    cJSON *result = impo_command_ok();
+    cJSON_AddStringToObject(result, "orientation", r.orientation);
+    cJSON_AddBoolToObject(result, "moving", r.moving);
+    cJSON *accel = cJSON_AddObjectToObject(result, "accel_g");
+    cJSON_AddNumberToObject(accel, "x", round(r.accel[0] * 100.0) / 100.0);
+    cJSON_AddNumberToObject(accel, "y", round(r.accel[1] * 100.0) / 100.0);
+    cJSON_AddNumberToObject(accel, "z", round(r.accel[2] * 100.0) / 100.0);
+    cJSON *gyro = cJSON_AddObjectToObject(result, "gyro_dps");
+    cJSON_AddNumberToObject(gyro, "x", round(r.gyro[0]));
+    cJSON_AddNumberToObject(gyro, "y", round(r.gyro[1]));
+    cJSON_AddNumberToObject(gyro, "z", round(r.gyro[2]));
+    return result;
+}
+
+/* USB diagnostics: ">chassis=forward" and the like, ">imu", ">touch" and ">snap". */
+bool impo_sparkbot_console(const char *line, bool whole)
+{
+    if (whole && !strcmp(line, "imu")) {
+        sparkbot_imu_reading_t r;
+        esp_err_t err = s_imu_ok ? sparkbot_imu_read(&r) : ESP_ERR_NOT_FOUND;
+        if (err != ESP_OK) {
+            printf("@imu {\"error\":\"%s\"}\n", esp_err_to_name(err));
+        } else {
+            printf("@imu {\"orientation\":\"%s\",\"moving\":%s,\"accel_g\":[%.2f,%.2f,%.2f],"
+                   "\"gyro_dps\":[%.0f,%.0f,%.0f]}\n", r.orientation, r.moving ? "true" : "false",
+                   r.accel[0], r.accel[1], r.accel[2], r.gyro[0], r.gyro[1], r.gyro[2]);
+        }
+        fflush(stdout);
+        return true;
+    }
+    if (whole && !strcmp(line, "snap")) {
+        console_snap();
+        return true;
+    }
+    if (whole && !strcmp(line, "touch")) {
+        printf("@touch {\"pads\":%u}\n", sparkbot_touch_state());
+        fflush(stdout);
+        return true;
+    }
+    if (strncmp(line, "chassis=", 8)) {
+        return false;
+    }
+    const char *direction = line + 8;
+    if (whole && !strncmp(direction, "light=", 6)) {
+        /* The base's light effect, by the remote command's name. */
+        cJSON *params = cJSON_CreateObject();
+        cJSON_AddStringToObject(params, "effect", direction + 6);
+        cJSON *result = chassis_light(params);
+        cJSON_Delete(params);
+        char *text = cJSON_PrintUnformatted(result);
+        printf("@chassis %s\n", text ? text : "{}");
+        free(text);
+        cJSON_Delete(result);
+        fflush(stdout);
+        return true;
+    }
+    static const struct {
+        const char *direction;
+        float x, y;
+    } moves[] = { { "forward", 0, 1 }, { "back", 0, -1 }, { "left", -1, 0 }, { "right", 1, 0 },
+                  { "stop", 0, 0 }, { "probe", 0, 0 } };
+    const float *move = NULL;
+    int ms = 300;   /* "forward:1000" holds it longer, up to two seconds */
+    const char *colon = strchr(direction, ':');
+    size_t name_len = colon ? (size_t)(colon - direction) : strlen(direction);
+    if (colon) {
+        ms = atoi(colon + 1);
+        ms = ms < 0 ? 0 : ms > 2000 ? 2000 : ms;
+    }
+    for (size_t i = 0; whole && i < sizeof(moves) / sizeof(moves[0]); ++i) {
+        if (strlen(moves[i].direction) == name_len && !strncmp(direction, moves[i].direction, name_len)) {
+            move = &moves[i].x;
+        }
+    }
+    if (!move) {
+        printf("@chassis {\"error\":\"use chassis=probe|stop|forward|back|left|right[:ms]|light=<effect>\"}\n");
+        fflush(stdout);
+        return true;
+    }
+    /* A pulse, held by the task like a remote drive, then a look at the echo. */
+    cJSON *result = base_drive(move[0], move[1], ms);
+    bool sent = cJSON_IsTrue(cJSON_GetObjectItem(result, "ok"));
+    cJSON_Delete(result);
+    vTaskDelay(pdMS_TO_TICKS(ms + 100));
+    if (xSemaphoreTake(s_base_lock, pdMS_TO_TICKS(100)) == pdTRUE) {
+        printf("@chassis {\"direction\":\"%.*s\",\"pulse_ms\":%d,\"sent\":%s,\"base\":\"%s\"}\n",
+               (int)name_len, direction, ms, sent ? "true" : "false", base_presence());
+        xSemaphoreGive(s_base_lock);
+    } else {
+        printf("@chassis {\"error\":\"busy\"}\n");
+    }
+    fflush(stdout);
+    return true;
 }
 
 static const impo_command_t s_commands[] = {
+    { "chassis.drive",
+      "Drive the SparkBot's tracked base, if it is sitting on one, for a while: forward speed and "
+      "turn, each -1 to 1 (turn with forward 0 spins in place). It stops by itself when the time "
+      "is up. The result says whether the base answered.",
+      NULL,
+      "{\"forward\":{\"type\":\"number\",\"description\":\"-1 (full speed back) to 1 (full speed forward); 0 if left out.\"},"
+      "\"turn\":{\"type\":\"number\",\"description\":\"-1 (left) to 1 (right); 0 if left out.\"},"
+      "\"duration_ms\":{\"type\":\"integer\",\"description\":\"How long, up to 10000; 500 if left out.\"}}",
+      chassis_drive },
     { "chassis.move",
-      "Drive the SparkBot's tracked base, if one is attached: one step forward, back, left or right, or stop.",
-      "{\"direction\":{\"type\":\"string\",\"description\":\"forward, back, left, right or stop.\"}}", NULL, chassis_move },
-    { "chassis.dance", "Make the SparkBot's tracked base do its dance, if one is attached.", NULL, NULL, chassis_dance },
+      "Move the SparkBot's tracked base, if it is sitting on one, in one direction for a while "
+      "(half a second if no duration), or stop it.",
+      "{\"direction\":{\"type\":\"string\",\"description\":\"forward, back, left, right or stop.\"}}",
+      "{\"duration_ms\":{\"type\":\"integer\",\"description\":\"How long, up to 10000; 500 if left out.\"}}",
+      chassis_move },
+    { "chassis.stop", "Stop the SparkBot's tracked base at once.", NULL, NULL, chassis_stop },
+    { "chassis.dance", "Make the SparkBot's tracked base do its own little dance, a few seconds long.",
+      NULL, NULL, chassis_dance },
     { "chassis.set_light",
-      "Choose the light effect on the SparkBot's tracked base, if one is attached.",
-      "{\"mode\":{\"type\":\"integer\",\"description\":\"1 to 6, the base's own effects.\"}}", NULL, chassis_light },
+      "Choose the effect on the tracked base's RGB lights.",
+      "{\"effect\":{\"type\":\"string\",\"description\":\"on, blink, breathe_slow, breathe_fast, flowing, show or off.\"}}",
+      NULL, chassis_light },
+    { "chassis.status",
+      "Whether a tracked base is answering the SparkBot and whether it is moving.",
+      NULL, NULL, chassis_status },
+    { "imu.read",
+      "Read the SparkBot's motion sensor: which way up it is (upright, upside_down, face_up, "
+      "face_down, on_left_side, on_right_side or tilted), whether it is being moved, and the raw "
+      "acceleration in g and rotation in degrees per second.",
+      NULL, NULL, imu_read },
 };
 
 static const impo_board_t s_board = {
@@ -332,7 +796,8 @@ static const impo_board_t s_board = {
     .round = false,
     .touch = false,
     .diagonal_in = 1.54f,
-    .talk_button = "boot",
+    .talk_button = "top",
+    .aux_button = "side",
     .frame_ms = 40,
     .init = init,
     .display_start = display_start,
@@ -345,6 +810,7 @@ static const impo_board_t s_board = {
     .mic_slot = 0,              /* one mic, on the left slot */
     .poll_buttons = poll_buttons,
     .wait_buttons = wait_buttons,
+    .read_power = read_power,
     .power_off = power_off,
     .commands = s_commands,
     .command_count = sizeof(s_commands) / sizeof(s_commands[0]),

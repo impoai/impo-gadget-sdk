@@ -27,8 +27,8 @@
 #include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "mbedtls/base64.h"
 #include "impo_board.h"
+#include "impo_camera.h"
 #include "impo_state.h"
 #include "impo_ui.h"
 #include "rom/tjpgd.h"
@@ -131,24 +131,12 @@ esp_err_t watcher_camera_prepare(void)
     return s_lock ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
-/* `jpeg` as base64, for camera.capture's result. */
-static char *to_base64(const uint8_t *jpeg, size_t len)
-{
-    size_t cap = (len + 2) / 3 * 4 + 1, out = 0;
-    char *b64 = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (b64 && mbedtls_base64_encode((unsigned char *)b64, cap, &out, jpeg, len) != 0) {
-        free(b64);
-        return NULL;
-    }
-    return b64;
-}
-
 static bool capture_frame(char **jpeg_base64, const char **error)
 {
     if (s_preview_active) {
         /* The preview has the camera: the frame it's showing is the photo. */
         xSemaphoreTake(s_lock, portMAX_DELAY);
-        *jpeg_base64 = s_last ? to_base64(s_last, s_last_len) : NULL;
+        *jpeg_base64 = s_last ? impo_camera_base64(s_last, s_last_len) : NULL;
         bool had = s_last != NULL;
         xSemaphoreGive(s_lock);
         *error = !had ? "no camera frame yet" : *jpeg_base64 ? NULL : "camera memory allocation failed";
@@ -163,7 +151,7 @@ static bool capture_frame(char **jpeg_base64, const char **error)
                                                  : "camera capture failed";
         return false;
     }
-    *jpeg_base64 = to_base64(frame.jpeg, frame.len);
+    *jpeg_base64 = impo_camera_base64(frame.jpeg, frame.len);
     camera_release(&frame);
     *error = *jpeg_base64 ? NULL : "camera memory allocation failed";
     return *jpeg_base64 != NULL;

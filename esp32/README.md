@@ -169,7 +169,7 @@ status screen.
 | Waveshare ESP32-S3-Touch-AMOLED-1.75 | UI, push-to-talk, settings, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
 | Espressif ESP32-S3-BOX-3 | UI, touch, push-to-talk, settings, images | [BOX-3 setup](devices/esp32-s3-box-3.md) |
 | AIPI Lite | UI, push-to-talk, two-button menu, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
-| Espressif ESP-SparkBot | UI, push-to-talk with the BOOT button, images. The backlight is on or off only, and the camera, touch pads and battery are not used | `tools/impo/board.sh build sparkbot` |
+| Espressif ESP-SparkBot | UI, push-to-talk with the top touch pad (or BOOT), the side pads as the aux button, images, the camera, motion sensor, battery and the optional tracked base. The backlight is on or off only | `tools/impo/board.sh build sparkbot` |
 | Waveshare ESP32-C6-Touch-AMOLED-1.8 | UI, push-to-talk with text replies | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
 | Seeed SenseCAP Watcher | UI, push-to-talk, settings, images | see [`AGENTS.md`](AGENTS.md#boards-with-the-full-ui-by-hand) |
 | M5Stack Cardputer ADV (experimental) | UI, GO/Space push-to-talk with text replies, Esc/Enter/arrow menu controls | `tools/impo/board.sh build cardputer-adv` |
@@ -242,6 +242,37 @@ A few things worth knowing:
   delete the build directory so the change takes effect.
 - Builds are signed with the included development key and never turn on
   Secure Boot, so you can reflash your board as often as you like.
+
+## The ESP-SparkBot's extras
+
+Beyond the common commands, the SparkBot offers its account `chassis.drive`,
+`chassis.move`, `chassis.stop`, `chassis.dance`, `chassis.set_light` and
+`chassis.status` for the optional tracked base, `imu.read` for its motion
+sensor and `camera.capture` for its camera. The base stops itself half a
+second after the last command it heard, so the head repeats a drive every
+200 ms until its `duration_ms` (500 by default, 10000 at most) is over, then
+sends a stop. The base echoes every byte it receives; each result's `base`
+says `responding`, `silent` or `unknown` from that echo, which proves the
+link, not that the tracks turned.
+
+The same base and sensor can be tried over USB without the gateway or Wi-Fi.
+With the head seated on the base, use its USB serial port:
+
+```sh
+python3 tools/impo/chassis.py /dev/cu.usbmodem2101 probe
+python3 tools/impo/chassis.py /dev/cu.usbmodem2101 forward
+```
+
+`probe` only sends a stop; `forward`, `back`, `left` and `right` run one
+300 ms pulse that the head ends by itself. `tools/impo/photo.py <port>
+[file.jpg]` takes a photo the same way. The console commands behind them are
+`>chassis=probe`, `>chassis=forward` and so on, `>imu`, `>touch` and `>snap`,
+each answered with a JSON frame of the same name.
+
+Units differ from Espressif's documentation: the one here carries a BMI260
+(not BMI270) and a GC2145 camera (not OV2640). The GC2145 can't make JPEG
+itself, so the head encodes its RGB565 frames with Espressif's SIMD encoder
+(esp_new_jpeg), a VGA photo in about a quarter of a second.
 
 ## Tests
 

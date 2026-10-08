@@ -121,6 +121,12 @@ menu "Impo"
             memory and preview decoding shares CPU time with voice and Link.
             Leave disabled to build without camera support.
 
+    # The camera.capture command, on boards with a camera to register
+    # (components/camera): the Watcher's Himax, the ESP-SparkBot's OV2640.
+    config IMPO_CAMERA
+        bool
+        default y if IMPO_WATCHER_CAMERA || IMPO_BOARD_ESPRESSIF_SPARKBOT
+
     config IMPO_HATCH
         bool "Impo's own voice session"
         depends on IMPO_ENABLED

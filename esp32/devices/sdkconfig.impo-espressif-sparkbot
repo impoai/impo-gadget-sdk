@@ -69,3 +69,11 @@ CONFIG_PM_PROFILING=y
 # The BOOT button is hidden under the shell, so pairing does not wait for a
 # press. Anyone in Bluetooth range can pair an unpaired unit; see the option.
 CONFIG_HOMEHUB_PAIRING_AUTO_CONFIRM=y
+
+# The camera's DMA goes through internal RAM in pieces small enough for what
+# is left of it once Wi-Fi, BLE and the UI are up. DMA straight into PSRAM
+# (CONFIG_CAMERA_PSRAM_DMA) loses its place whenever the CPU is busy in PSRAM,
+# which it is while a photo is encoded: every frame after the first came back
+# scrambled below its first rows.
+# CONFIG_CAMERA_PSRAM_DMA is not set
+CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX=16384

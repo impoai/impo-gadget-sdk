@@ -128,16 +128,41 @@ void impo_commands_describe(cJSON *commands)
     }
 }
 
+/* Link sends back only "ok", "error" and "payload": whatever else a command
+ * put in its result (a reading, a state) is gathered under "payload". */
+static cJSON *wrap(cJSON *result)
+{
+    if (!result || cJSON_GetObjectItem(result, "payload")) {
+        return result;
+    }
+    cJSON *payload = NULL;
+    cJSON *item = result->child;
+    while (item) {
+        cJSON *next = item->next;
+        if (strcmp(item->string, "ok") && strcmp(item->string, "error")) {
+            if (!payload) {
+                payload = cJSON_CreateObject();
+            }
+            cJSON_AddItemToObject(payload, item->string, cJSON_DetachItemViaPointer(result, item));
+        }
+        item = next;
+    }
+    if (payload) {
+        cJSON_AddItemToObject(result, "payload", payload);
+    }
+    return result;
+}
+
 cJSON *impo_commands_run(const char *name, const cJSON *params)
 {
     for (size_t i = 0; i < sizeof(COMMON) / sizeof(COMMON[0]); i++) {
         if (!strcmp(name, COMMON[i].name)) {
-            return COMMON[i].run(params);
+            return wrap(COMMON[i].run(params));
         }
     }
     for (int i = 0; impo_board && i < impo_board->command_count; i++) {
         if (!strcmp(name, impo_board->commands[i].name)) {
-            return impo_board->commands[i].run(params);
+            return wrap(impo_board->commands[i].run(params));
         }
     }
     return NULL;
