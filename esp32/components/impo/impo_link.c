@@ -76,6 +76,15 @@ bool impo_link_talk_press(void)
     return s_ops && s_ops->talk_press && s_ops->talk_press();
 }
 
+bool impo_link_send_event(const char *event, cJSON *data)
+{
+    if (s_ops && s_ops->send_event) {
+        return s_ops->send_event(event, data);
+    }
+    cJSON_Delete(data);
+    return false;
+}
+
 void impo_link_reset_setup(void)
 {
     if (s_ops && s_ops->reset_setup) {

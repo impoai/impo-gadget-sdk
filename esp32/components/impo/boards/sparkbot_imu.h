@@ -40,6 +40,14 @@ esp_err_t sparkbot_imu_init(i2c_master_bus_handle_t bus);
 
 esp_err_t sparkbot_imu_read(sparkbot_imu_reading_t *out);
 
+/*
+ * Watches the sensor for what the agent should hear about, and sends each as a
+ * link.event: "shaken" (data: how hard), "picked_up" (data: the new
+ * orientation) once the gadget has left its upright rest for a moment, and
+ * "put_down" once it is back. Debounced so a fidget isn't a conversation.
+ */
+esp_err_t sparkbot_imu_watch_start(void);
+
 #ifdef __cplusplus
 }
 #endif

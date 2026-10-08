@@ -211,8 +211,8 @@ static noise_ctrl_session_generation_t s_session_generation_counter = 0;
 // go through a queue.
 struct pending_result {
     noise_ctrl_session_generation_t session_generation;
-    char *request_id;
-    cJSON *result;
+    char *request_id;        // a link.result for this invoke, or NULL for a link.event
+    cJSON *result;           // the result, or the event's {event, data}
 };
 static QueueHandle_t s_result_q = nullptr;
 
@@ -1496,6 +1496,20 @@ static void queue_result(noise_ctrl_session_generation_t session_generation,
     }
 }
 
+// A link.event: {"method":"link.event","params":{"event":..., "data":{...}}}, no reply expected.
+static char *wrap_event_json(cJSON *params) {
+    cJSON *root = cJSON_CreateObject();
+    if (!root || !cJSON_AddStringToObject(root, "method", "link.event")) {
+        cJSON_Delete(root);
+        cJSON_Delete(params);
+        return nullptr;
+    }
+    cJSON_AddItemToObject(root, "params", params);
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return json;
+}
+
 static void noise_ota_status(const ota_event_t *ev, void *user) {
     auto *ctx = static_cast<ota_ctx *>(user);
     cJSON *result = cJSON_CreateObject();
@@ -2189,7 +2203,7 @@ static session_result_t run_session(stack_monitor_t *stack) {
             }
             // wrap_result_json consumes the result tree. Retain its output
             // directly; there is no second whole-message allocation/copy.
-            char *json = wrap_result_json(pr.request_id, pr.result);
+            char *json = pr.request_id ? wrap_result_json(pr.request_id, pr.result) : wrap_event_json(pr.result);
             free(pr.request_id);
             if (json) {
                 control_tx = {json, strlen(json), 0, false, session_generation};
@@ -2459,6 +2473,27 @@ extern "C" bool noise_ctrl_is_connected(void) {
 
 extern "C" bool noise_ctrl_is_running(void) {
     return s_task != nullptr;
+}
+
+extern "C" bool noise_ctrl_send_event(const char *event, cJSON *data) {
+    if (!event || !s_result_q || !s_connected) {
+        cJSON_Delete(data);
+        return false;
+    }
+    cJSON *params = cJSON_CreateObject();
+    if (!params) {
+        cJSON_Delete(data);
+        return false;
+    }
+    cJSON_AddStringToObject(params, "event", event);
+    cJSON_AddItemToObject(params, "data", data ? data : cJSON_CreateObject());
+    cJSON_AddNumberToObject(params, "uptime_ms", (double)(esp_timer_get_time() / 1000));
+    pending_result pr = {s_session_generation_counter, nullptr, params};
+    if (xQueueSend(s_result_q, &pr, 0) != pdTRUE) {
+        cJSON_Delete(params);
+        return false;
+    }
+    return true;
 }
 
 extern "C" void noise_ctrl_send_command_result(

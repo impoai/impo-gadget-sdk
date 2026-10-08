@@ -401,6 +401,7 @@ static const impo_link_ops_t s_ops = {
     .wifi_nap = op_wifi_nap,
     .wifi_saved = op_wifi_saved,
     .wifi_forget = op_wifi_forget,
+    .send_event = noise_ctrl_send_event,
 };
 
 // ---- Keeper: joins a saved network and applies BLE, on an internal stack ----

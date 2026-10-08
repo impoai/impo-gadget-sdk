@@ -163,6 +163,9 @@ static esp_err_t init(void)
         ESP_LOGW(TAG, "touch pads: %s", esp_err_to_name(err));
     }
     s_imu_ok = sparkbot_imu_init(s_i2c) == ESP_OK;
+    if (s_imu_ok) {
+        sparkbot_imu_watch_start();   /* shaken, picked up, put down: link.event */
+    }
 
     const adc_oneshot_unit_init_cfg_t adc_cfg = { .unit_id = BATT_ADC_UNIT };
     ESP_RETURN_ON_ERROR(adc_oneshot_new_unit(&adc_cfg, &s_adc), TAG, "adc");

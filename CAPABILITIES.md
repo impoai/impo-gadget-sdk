@@ -146,12 +146,23 @@ base answered the gadget, which proves the link, not the movement.
 | `device.discover` | gadgets with the tunnel | — | devices found on the home network |
 | `device.ota` | gadgets with OTA on | `url`, `force`? | — (not offered to the agent) |
 
-## Events (planned)
+## Events
 
-Today the agent calls the gadget; the gadget never calls the agent. A
-`link.event` from the gadget (a pad touched, the gadget picked up or shaken,
-the base bumping into something) is the next addition to the protocol, so the
-agent can react to the world instead of only polling it.
+The gadget can call the agent too: `link.event` on the control stream, with
+`{"event": "<name>", "data": {...}, "uptime_ms"}`. The gateway tells the agent
+as a message from the gadget ("[Gadget event] Desk Bot: shaken (peak_g=2.3,
+strength=hard)"), and the agent's reply is spoken by the gadget. Events are
+for things worth a remark, debounced on the gadget; the gateway ignores a
+repeat of the same event from the same gadget within three seconds.
+
+| Event | Who sends it | Data |
+|---|---|---|
+| `shaken` | `motion_sensor` | `peak_g`, `strength` gentle/hard |
+| `picked_up` | `motion_sensor` | `orientation` it ended up in |
+| `put_down` | `motion_sensor` | `orientation` (upright) |
+
+A board sends one with `impo_link_send_event(name, data)`; a new event name
+gets a row here first.
 
 ## Adding to this
 

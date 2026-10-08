@@ -20,6 +20,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "cJSON.h"
+
 #include "esp_err.h"
 
 #include "impo_wifi.h"
@@ -74,6 +76,8 @@ typedef struct {
     void (*wifi_nap)(bool nap);                   /* screen off a while: leave Wi-Fi until false */
     int (*wifi_saved)(impo_wifi_saved_t *out, int max);   /* most recently joined first */
     void (*wifi_forget)(const char *ssid);        /* one saved network; empty forgets them all */
+    /* A link.event to the gateway (takes `data`); false when it couldn't go. */
+    bool (*send_event)(const char *event, cJSON *data);
 } impo_link_ops_t;
 
 void impo_link_register(const impo_link_ops_t *ops);
@@ -88,6 +92,14 @@ bool impo_link_hatch_vm(const char *want_vm, char *vm_id, size_t id_cap, char *v
                         char **vm_token);
 bool impo_link_talk_press(void);
 void impo_link_reset_setup(void);
+
+/*
+ * Tells the agent something happened to the gadget: a link.event named
+ * `event` ("shaken", "picked_up", "put_down"...) with `data` (taken over, may
+ * be NULL). The gateway passes it to Impo as a message from the gadget, so
+ * send only what is worth a reply, debounced. False when it couldn't go.
+ */
+bool impo_link_send_event(const char *event, cJSON *data);
 /* The first saved network, owned by Link. Return false when Link hasn't registered. */
 bool impo_link_wifi_get(char *ssid, char *pass);
 bool impo_link_wifi_set(const char *ssid, const char *pass);

@@ -578,6 +578,13 @@ static bool console_command(char *line, bool whole)
         return true;
     }
 #endif
+    if (!strncmp(line, "event=", 6) && whole) {
+        /* Bench: a link.event by name, as a board would send it ("event=shaken"). */
+        bool sent = impo_link_send_event(line + 6, NULL);
+        printf("@event {\"event\":\"%s\",\"sent\":%s}\n", line + 6, sent ? "true" : "false");
+        fflush(stdout);
+        return true;
+    }
     if (!strcmp(line, "status")) {
         size_t cap = 1024;   /* long SSID, host and VM names escaped: past 512 */
         char *json = heap_caps_malloc(cap, IMPO_BIG_CAPS);

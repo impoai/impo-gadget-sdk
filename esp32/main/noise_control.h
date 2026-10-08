@@ -96,6 +96,12 @@ void noise_ctrl_send_command_result(
     noise_ctrl_session_generation_t session_generation,
     const char *request_id, cJSON *result);
 
+// Tells the gateway something happened to the gadget (a link.event with
+// `event` and `data`, which this takes over), for the agent to react to. No
+// reply comes back. False, and `data` freed, when not connected or the queue
+// is full; events are the gadget's to debounce, not the gateway's.
+bool noise_ctrl_send_event(const char *event, cJSON *data);
+
 // ---- Extra daemon requests on this session (Impo builds only) ----
 //
 // Any task can open an HTTP request to the VM daemon on its own stream of this
