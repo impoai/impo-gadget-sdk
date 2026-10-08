@@ -92,7 +92,8 @@ bool impo_settings_speaker_on(void) {
 }
 
 // No screen either, so reply text is never shown; Impo's default page.
-void impo_state_page(int *cols, int *lines) {
+void impo_state_page(bool cjk, int *cols, int *lines) {
+    (void)cjk;
     *cols = 16;
     *lines = 2;
 }

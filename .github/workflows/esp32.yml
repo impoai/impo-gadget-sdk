@@ -104,6 +104,12 @@ jobs:
           - board: devkit
             target: esp32c5
             overlays: ""
+          - board: c6-nopsram
+            target: esp32c6
+            overlays: ";devices/sdkconfig.c6-nopsram"
+          - board: waveshare-c6-lcd-147
+            target: esp32c6
+            overlays: ";devices/sdkconfig.waveshare-c6-lcd-147"
           - board: ideaspark
             target: esp32
             overlays: ";devices/sdkconfig.ideaspark"
@@ -113,15 +119,30 @@ jobs:
           - board: reterminal-e1001
             target: esp32s3
             overlays: ";devices/sdkconfig.reterminal-e1001"
+          - board: reterminal-e1002
+            target: esp32s3
+            overlays: ";devices/sdkconfig.reterminal-e1002"
           - board: home-assistant-voice
             target: esp32s3
             overlays: ";devices/sdkconfig.home-assistant-voice"
+          - board: espressif-s3-devkitc-1
+            target: esp32s3
+            overlays: ";devices/sdkconfig.espressif-s3-devkitc-1"
+          - board: seeed-respeaker-lite
+            target: esp32s3
+            overlays: ";devices/sdkconfig.seeed-respeaker-lite"
           - board: impo-waveshare-s3-175c
             target: esp32s3
             overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-175c"
           - board: impo-waveshare-s3-175
             target: esp32s3
             overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-175"
+          - board: impo-waveshare-s3-lcd7
+            target: esp32s3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-lcd7"
+          - board: impo-waveshare-s3-216
+            target: esp32s3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-216"
           - board: impo-espressif-sparkbot
             target: esp32s3
             overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-espressif-sparkbot"
@@ -131,6 +152,9 @@ jobs:
           - board: impo-waveshare-c6-18
             target: esp32c6
             overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-c6-18"
+          - board: impo-waveshare-c6-206
+            target: esp32c6
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-c6-206"
           - board: impo-sensecap-watcher
             target: esp32s3
             overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-sensecap-watcher"
@@ -149,9 +173,24 @@ jobs:
           - board: impo-m5stack-cores3
             target: esp32s3
             overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-cores3"
+          - board: impo-guition-jc3248w535
+            target: esp32s3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-guition-jc3248w535"
           - board: impo-m5stack-stickc-plus2
             target: esp32
             overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-stickc-plus2"
+          - board: impo-m5stack-core2
+            target: esp32
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-core2"
+          - board: impo-fnk0104b
+            target: esp32s3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-fnk0104b"
+          - board: impo-vn-s3-183
+            target: esp32s3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-vn-s3-183"
+          - board: impo-ai-passport
+            target: esp32c3
+            overlays: ";devices/sdkconfig.impo;devices/sdkconfig.impo-ai-passport"
     defaults:
       run:
         shell: bash

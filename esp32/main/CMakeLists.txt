@@ -81,21 +81,28 @@ if(CONFIG_IMPO_ENABLED)
     list(APPEND GADGET_SRCS "impo_glue.c")
 endif()
 
-if(CONFIG_HOMEHUB_LED_BACKEND_DEVKIT_GPIO27 OR CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING)
+if(CONFIG_HOMEHUB_LED_BACKEND_DEVKIT_GPIO27 OR CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING OR CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE)
     list(APPEND GADGET_REQUIRES led_strip)
 endif()
 
 if(CONFIG_HOMEHUB_SENSECAP_SENSORS)
     list(APPEND GADGET_SRCS "sensecap_sensors.c")
 endif()
+if(CONFIG_HOMEHUB_RETERMINAL_SHT4X)
+    list(APPEND GADGET_SRCS "reterminal_sht4x.c")
+endif()
 
 if(CONFIG_HOMEHUB_VOICE)
     list(APPEND GADGET_SRCS
         "voice.c"
-        "voice_board.c"
         "voice_impo_chat.c"
         "voice_player.c"
     )
+    if(CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE)
+        list(APPEND GADGET_SRCS "voice_board_respeaker_lite.c")
+    else()
+        list(APPEND GADGET_SRCS "voice_board.c")
+    endif()
 endif()
 
 idf_component_register(

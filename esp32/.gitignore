@@ -28,6 +28,8 @@ dependencies.lock
 
 # Your own avatar (tools/impo/AVATAR_RECIPE.md): built when present, never committed.
 components/impo/avatar/
+# tools/impo/make_gifs.py's default output directory.
+/gifs/
 
 # Local debug artifacts (not tracked).
 *.log

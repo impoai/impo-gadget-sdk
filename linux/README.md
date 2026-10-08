@@ -122,7 +122,7 @@ A few other ways to build on it:
 ## Manage it
 
 ```sh
-impogadget info                          # name, node id and pairing state
+sudo impogadget info                     # name, node id and pairing state
 sudo systemctl status impogadget         # is it running?
 sudo journalctl -u impogadget -f         # follow the log
 sudo impogadget pair                     # pair again

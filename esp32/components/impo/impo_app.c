@@ -78,7 +78,11 @@ void impo_app_run(const impo_board_t *board)
 
     /* Let the boot animation (flame ignites, eyes open) play out. */
     vTaskDelay(pdMS_TO_TICKS(1400));
-    if (impo_voice_start(q) != ESP_OK) {
+    if (!board->audio_init) {
+        ESP_LOGI(TAG, "display-only board: no microphone or speaker");
+        impo_state_set_mode(IMPO_MODE_IDLE);
+        impo_state_set_caption("%s", "");
+    } else if (impo_voice_start(q) != ESP_OK) {
         ESP_LOGE(TAG, "voice pipeline unavailable");
     } else {
         impo_state_set_mode(IMPO_MODE_IDLE);

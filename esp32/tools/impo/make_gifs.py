@@ -15,7 +15,7 @@
 
 """Render every Impo animation to an animated GIF using the firmware's renderer.
 
-    python3 tools/impo/make_gifs.py [--default | --src FILE] [out_dir]     (default: ./gifs)
+    python3 tools/impo/make_gifs.py [--default | --src FILE] [out_dir]     (default: esp32/gifs)
 
 Draws your own avatar (components/impo/avatar/impo_pixel.c, see AVATAR_RECIPE.md)
 when there is one, else the default avatar. Needs a C compiler and Pillow.

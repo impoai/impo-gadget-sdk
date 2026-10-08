@@ -17,8 +17,8 @@
 # sdkconfig.impo-waveshare-s3-175c, sdkconfig.impo-aipi,
 # sdkconfig.impo-waveshare-c6-18, sdkconfig.impo-sensecap-watcher,
 # sdkconfig.impo-espressif-box-3, sdkconfig.impo-m5stack-sticks3,
-# sdkconfig.impo-m5stack-stopwatch, sdkconfig.impo-m5stack-cores3 or
-# sdkconfig.impo-m5stack-stickc-plus2.
+# sdkconfig.impo-m5stack-stopwatch, sdkconfig.impo-m5stack-cores3,
+# sdkconfig.impo-m5stack-stickc-plus2 or sdkconfig.impo-guition-jc3248w535.
 # Link owns Wi-Fi, BLE pairing, credentials and OTA; the display shows Link's
 # status instead of a status LED.
 CONFIG_HOMEHUB_LED_BACKEND_IMPO=y
