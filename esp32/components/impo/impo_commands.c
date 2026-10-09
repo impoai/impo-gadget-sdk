@@ -115,6 +115,7 @@ static cJSON *beep(const cJSON *params)
 #define SOUND_WRITE_WAIT_MS 20000       /* for room: the decoder frees it as it plays */
 
 static volatile bool s_fetching;
+static char s_last_url[128];   /* what speaker.play_url last tried, for speaker.status */
 
 static void sound_task(void *arg)
 {
@@ -198,6 +199,7 @@ static cJSON *play_url(const cJSON *params)
         return impo_command_error("out_of_memory", "no memory for the request");
     }
     s_fetching = true;
+    strlcpy(s_last_url, copy, sizeof(s_last_url));
     if (xTaskCreateWithCaps(sound_task, "sound_url", 6144, copy, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
         s_fetching = false;
         free(copy);
@@ -245,6 +247,9 @@ static cJSON *speaker_status(const cJSON *params)
     if (error[0]) {
         cJSON_AddStringToObject(result, "error", error);
     }
+    if (s_last_url[0]) {
+        cJSON_AddStringToObject(result, "last_url", s_last_url);
+    }
     cJSON_AddNumberToObject(result, "volume_percent", impo_settings_volume());
     cJSON_AddBoolToObject(result, "speaker_on", impo_settings_speaker_on());
     return result;
@@ -265,9 +270,11 @@ static const impo_command_t COMMON[] = {
       "Play one short chirp on the gadget's speaker, to get attention or to check the speaker works.",
       NULL, NULL, beep },
     { "speaker.play_url",
-      "Play a sound on the gadget's speaker from a public https URL of an MP3 file (music, a sound "
-      "effect, speech), up to about a minute of it. The gadget fetches the file itself, so the URL "
-      "must be reachable without a login. Returns at once; the sound starts a few seconds later.",
+      "Play a sound on the gadget's speaker from a public https URL that points straight at an MP3 "
+      "file (music, a sound effect, speech), up to about a minute of it. The gadget fetches the file "
+      "itself with no login and no browser, so a web page, a streaming service or a player link won't "
+      "do: the response must be the audio bytes. Returns at once; the sound starts within a couple of "
+      "seconds, and speaker.status says whether it played or why not.",
       "{\"url\":{\"type\":\"string\",\"description\":\"https URL of an MP3 file, up to 1.5 MB.\"}}",
       NULL, play_url },
     { "speaker.say",

@@ -73,6 +73,12 @@ Three layers, each adapted by different people:
 | **Capabilities**: a fixed vocabulary of commands (`display.*`, `speaker.*`, `camera.*`, `imu.*`, `chassis.*`, `sensors.*`, `device.*`) with their parameters and results, plus a summary of what the gadget has | [`CAPABILITIES.md`](CAPABILITIES.md) | This project. A board registers the capabilities it implements; the agent and the app rely on the contract. |
 | **Ecosystem**: other people's devices on the home network, reached through a gadget's tunnel | [`skills/`](skills), one guide per product | The agent, following the skill; nothing in the firmware knows the product. |
 
+Between the agent and the boards, [`docs/GADGET-AGENTS.md`](docs/GADGET-AGENTS.md)
+proposes a layer of small agents a person makes in plain language and binds
+to their gadgets: triggers from the physical world, allowed actions, a
+little state, run by the platform. [`docs/architecture.html`](docs/architecture.html)
+draws the whole stack.
+
 Speech to text, text to speech and seeing pictures are the Impo server's,
 not the gadget's: a gadget sends voice notes and gets spoken replies through
 `gadgets.impo.ai` with its own device token, and no third-party key is ever
