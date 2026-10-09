@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Impo Gadgets Architecture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+
+  /* Layout: one column of reading width; the layer diagram and the ownership table run full width. */
+  :root {
+    --bg: #f3f5f7; --surface: #ffffff; --fg: #1d2630; --muted: #5b6b7a; --line: #d3dae1;
+    --accent: #0f6e6a; --accent-soft: #d9efed;
+    --maker: #b45309; --maker-soft: #fdebd0;
+    --agent: #6d28d9; --agent-soft: #ece4fb;
+    --platform: #1d4ed8; --platform-soft: #dde7fb;
+    --planned: #8a97a3;
+    --sans: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0f1418; --surface: #171d23; --fg: #e6ebef; --muted: #9aa8b4; --line: #2b353f;
+    --accent: #4fc3bd; --accent-soft: #12302f;
+    --maker: #f0a24b; --maker-soft: #3a2a12;
+    --agent: #b394f5; --agent-soft: #2a1f44;
+    --platform: #7fa6ff; --platform-soft: #172446;
+    --planned: #6b7883; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #0f1418; --surface: #171d23; --fg: #e6ebef; --muted: #9aa8b4; --line: #2b353f;
+    --accent: #4fc3bd; --accent-soft: #12302f;
+    --maker: #f0a24b; --maker-soft: #3a2a12;
+    --agent: #b394f5; --agent-soft: #2a1f44;
+    --platform: #7fa6ff; --platform-soft: #172446;
+    --planned: #6b7883; color-scheme: dark }
+
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.65; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding-block: 40px 64px; padding-inline: 20px; }
+  h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 8px; text-wrap: balance; }
+  h2 { font-size: 20px; font-weight: 600; margin: 48px 0 12px; text-wrap: balance; }
+  h3 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+  p { max-width: 68ch; margin: 0 0 12px; }
+  .lede { color: var(--muted); font-size: 16px; max-width: 70ch; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--accent-soft); color: var(--fg); padding: 1px 5px; border-radius: 3px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 18px 0 8px; font-size: 13px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .legend .pl::before { background: var(--platform); }
+  .legend .mk::before { background: var(--maker); }
+  .legend .ag::before { background: var(--agent); }
+  .legend .pn::before { background: var(--planned); }
+  .diagram { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px; }
+  .diagram svg { display: block; min-width: 760px; width: 100%; height: auto; font-family: var(--sans); }
+  .diagram text { fill: var(--fg); }
+  .diagram .mono { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+  .diagram .cap { font-size: 11px; fill: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+  .diagram .t { font-size: 13px; font-weight: 600; }
+  .diagram .s { font-size: 12px; fill: var(--muted); }
+  .diagram .box { stroke-width: 1.2; }
+  .diagram .pl { fill: var(--platform-soft); stroke: var(--platform); }
+  .diagram .mk { fill: var(--maker-soft); stroke: var(--maker); }
+  .diagram .ag { fill: var(--agent-soft); stroke: var(--agent); }
+  .diagram .pn { fill: none; stroke: var(--planned); stroke-dasharray: 5 4; }
+  .diagram .lane { fill: none; stroke: var(--line); }
+  .diagram .arrow { stroke: var(--fg); stroke-width: 1.4; fill: none; }
+  .diagram .arrow.dim { stroke: var(--planned); stroke-dasharray: 5 4; }
+  .diagram .flow { font-family: var(--mono); font-size: 11px; fill: var(--fg); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .tablewrap { overflow-x: auto; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; margin-right: 6px; }
+  .tag.pl { background: var(--platform-soft); color: var(--platform); }
+  .tag.mk { background: var(--maker-soft); color: var(--maker); }
+  .tag.ag { background: var(--agent-soft); color: var(--agent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; min-width: 0; }
+  .card p { font-size: 14px; margin-bottom: 6px; }
+  .card ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+  .shapes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .shape { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; }
+  .shape.planned { border-left-color: var(--planned); color: var(--muted); }
+  .shape b { display: block; font-size: 14px; }
+  .note { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; margin-top: 40px; max-width: 80ch; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Impo Gadgets 架构与分层</h1>
+  <p class="lede">一台硬件要变成 Impo 的 gadget，要穿过六层。下面标出每一层归谁：平台固定的、做硬件的人要动的、以及 agent 行为能被谁改。依据是 Impo fork 的 SDK 代码和 Muse 上游的结构，不是设想。</p>
+
+  <div class="legend">
+    <span class="pl">平台（Impo 维护，开源，接硬件的人不碰）</span>
+    <span class="mk">Maker 定制（接一块新板子要写的）</span>
+    <span class="ag">Agent 行为可定制的点</span>
+    <span class="pn">计划中</span>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 980 760" role="img" aria-label="Impo Gadgets 六层架构图，从硬件到应用，标出平台、Maker 和 Agent 各自负责的部分">
+      <!-- lane labels on the left -->
+      <g class="cap">
+        <text x="16" y="52">6 应用</text>
+        <text x="16" y="146">5 Agent</text>
+        <text x="16" y="262">4 Impo 服务端</text>
+        <text x="16" y="384">3 网关</text>
+        <text x="16" y="486">2 固件平台</text>
+        <text x="16" y="652">1 硬件板</text>
+      </g>
+      <g class="lane">
+        <line x1="110" y1="92" x2="964" y2="92"/>
+        <line x1="110" y1="206" x2="964" y2="206"/>
+        <line x1="110" y1="332" x2="964" y2="332"/>
+        <line x1="110" y1="436" x2="964" y2="436"/>
+        <line x1="110" y1="606" x2="964" y2="606"/>
+      </g>
+
+      <!-- 6 apps -->
+      <rect class="box pl" x="120" y="24" width="300" height="56" rx="6"/>
+      <text class="t" x="134" y="46">iOS / Android App</text>
+      <text class="s" x="134" y="66">BLE 配对、Gadgets 列表、显示回复和附件（照片）</text>
+      <rect class="box pl" x="440" y="24" width="300" height="56" rx="6"/>
+      <text class="t" x="454" y="46">能力摘要 capabilities</text>
+      <text class="s" x="454" y="66">屏幕 / 扬声器 / 摄像头 / 电池 / features</text>
+
+      <!-- 5 agent -->
+      <rect class="box ag" x="120" y="108" width="390" height="86" rx="6"/>
+      <text class="t" x="134" y="130">Impo 主 agent（Rebyte 沙箱）</text>
+      <text class="s" x="134" y="150">impo_list_gadgets → impo_gadget_command；照片进 /workspace/outputs/</text>
+      <text class="s" x="134" y="168">可改的点：gadget 指令段、每条命令自带的描述、</text>
+      <text class="s" x="134" y="186">skills/（第三方设备的玩法说明）</text>
+      <rect class="box ag" x="530" y="108" width="210" height="86" rx="6"/>
+      <text class="t" x="544" y="130">skills/ 生态层</text>
+      <text class="s" x="544" y="150">上游 44 份 SKILL.md：</text>
+      <text class="s" x="544" y="168">Sonos、Hue、Roomba…</text>
+      <text class="s" x="544" y="186">agent 经隧道直接控制</text>
+      <rect class="box pn" x="760" y="108" width="204" height="86" rx="6"/>
+      <text class="t" x="774" y="130">感知 worker（计划）</text>
+      <text class="s" x="774" y="150">camera.watch 帧流 →</text>
+      <text class="s" x="774" y="168">便宜的视觉模型 + 变化检测</text>
+      <text class="s" x="774" y="186">→ 语义事件给 agent</text>
+
+      <!-- 4 server -->
+      <rect class="box pl" x="120" y="222" width="300" height="96" rx="6"/>
+      <text class="t" x="134" y="244">Impo API + worker</text>
+      <text class="s" x="134" y="264">gadget tools、附件投递、会话</text>
+      <text class="s" x="134" y="282">/voice/transcriptions（STT）</text>
+      <text class="s" x="134" y="300">/voice/speech（TTS）</text>
+      <rect class="box pl" x="440" y="222" width="300" height="96" rx="6"/>
+      <text class="t" x="454" y="244">基础能力：Gemini</text>
+      <text class="s" x="454" y="264">听写、合成语音、看图</text>
+      <text class="s" x="454" y="282">API key 只在这一层</text>
+      <text class="s" x="454" y="300">gadget 和 App 用自己的令牌来调</text>
+      <rect class="box pl" x="760" y="222" width="204" height="96" rx="6"/>
+      <text class="t" x="774" y="244">账号 / 配对</text>
+      <text class="s" x="774" y="264">/api/v1/gadgets</text>
+      <text class="s" x="774" y="282">route = 账号 subject</text>
+      <text class="s" x="774" y="300">一个账号够不到别人的 gadget</text>
+
+      <!-- 3 gateway -->
+      <rect class="box pl" x="120" y="348" width="844" height="76" rx="6"/>
+      <text class="t" x="134" y="370">gadgets.impo.ai（Cloudflare Worker + 每账号一个 Durable Object）</text>
+      <text class="s" x="134" y="390">Noise XX 加密会话 · link.register（命令 + 能力）· link.invoke / link.result · link.event · POST /chat/stream · POST /tts 代理 · 回复中继</text>
+      <text class="s" x="134" y="408">设备令牌 HMAC 签名、无状态；删除配对即让在线 gadget 自我清除</text>
+
+      <!-- 2 firmware platform -->
+      <rect class="box pl" x="120" y="452" width="200" height="140" rx="6"/>
+      <text class="t" x="134" y="474">Home Link 核心</text>
+      <text class="s" x="134" y="494">Wi-Fi、BLE 配对</text>
+      <text class="s" x="134" y="512">Noise 会话、OTA</text>
+      <text class="s" x="134" y="530">device.health / discover</text>
+      <text class="s" x="134" y="548">隧道（本地网络）</text>
+      <rect class="box pl" x="334" y="452" width="200" height="140" rx="6"/>
+      <text class="t" x="348" y="474">Impo UI 与语音</text>
+      <text class="s" x="348" y="494">头像、字幕（含 CJK）</text>
+      <text class="s" x="348" y="512">按住说话 → Hatch 回合</text>
+      <text class="s" x="348" y="530">回复语音流式解码</text>
+      <text class="s" x="348" y="548">impo_sound：say / play_url</text>
+      <text class="s" x="348" y="566">菜单、设置、电量</text>
+      <rect class="box pl" x="548" y="452" width="200" height="140" rx="6"/>
+      <text class="t" x="562" y="474">能力词汇表</text>
+      <text class="s" x="562" y="494">CAPABILITIES.md</text>
+      <text class="s" x="562" y="512">display.* speaker.*</text>
+      <text class="s" x="562" y="530">camera.* imu.* chassis.*</text>
+      <text class="s" x="562" y="548">sensors.* device.*</text>
+      <text class="s" x="562" y="566">事件：shaken / picked_up…</text>
+      <rect class="box pl" x="762" y="452" width="202" height="140" rx="6"/>
+      <text class="t" x="776" y="474">板子接口</text>
+      <text class="mono" x="776" y="494">impo_board_t</text>
+      <text class="s" x="776" y="512">display_start · audio_init</text>
+      <text class="s" x="776" y="530">poll_buttons · read_power</text>
+      <text class="s" x="776" y="548">camera_register · commands</text>
+      <text class="s" x="776" y="566">features · 内存预算</text>
+
+      <!-- 1 hardware / boards -->
+      <rect class="box mk" x="120" y="622" width="270" height="116" rx="6"/>
+      <text class="t" x="134" y="644">板子文件（一块板 = 一个文件）</text>
+      <text class="mono" x="134" y="664">boards/board_espressif_sparkbot.c</text>
+      <text class="s" x="134" y="684">引脚、屏、codec、按键、电池</text>
+      <text class="s" x="134" y="702">+ sparkbot_touch.c / sparkbot_imu.c</text>
+      <text class="s" x="134" y="720">+ 底盘命令表、features 列表</text>
+      <rect class="box mk" x="404" y="622" width="270" height="116" rx="6"/>
+      <text class="t" x="418" y="644">构建配置</text>
+      <text class="mono" x="418" y="664">devices/sdkconfig.impo-&lt;board&gt;</text>
+      <text class="s" x="418" y="684">flash / PSRAM / 相机 DMA / CJK 字体</text>
+      <text class="s" x="418" y="702">board.sh、ports.py 登记</text>
+      <text class="s" x="418" y="720">devices/README.md 功能表</text>
+      <rect class="box mk" x="688" y="622" width="276" height="116" rx="6"/>
+      <text class="t" x="702" y="644">硬件</text>
+      <text class="s" x="702" y="664">ESP32-S3 / C6 / C5、Linux 盒子</text>
+      <text class="s" x="702" y="684">传感器驱动（BMI260、GC2145…）</text>
+      <text class="s" x="702" y="702">外设协议（底盘 UART "x0.0 y1.0"）</text>
+      <text class="s" x="702" y="720">物理按键 / 触摸条 / 磁吸口</text>
+
+    </svg>
+  </div>
+
+  <h2>三种交互形状</h2>
+  <div class="shapes">
+    <div class="shape"><b>命令（agent → gadget）</b><code>link.invoke</code> → <code>link.result</code>。一问一答，30 秒内。<code>camera.capture</code>、<code>speaker.say</code>、<code>chassis.move</code> 都是这一种。</div>
+    <div class="shape"><b>事件（gadget → agent）</b><code>link.event</code>。离散、设备端去抖、网关 3 秒去重。被摇、被拿起、被放下；agent 的回答用 <code>speaker.say</code> 说出来。Muse 上游没有这一种。</div>
+    <div class="shape planned"><b>观察流（计划）</b><code>camera.watch {fps, seconds}</code>：设备持续推帧，感知 worker 只把语义变化变成事件；主 agent 不在每帧循环里。</div>
+  </div>
+
+  <h2>谁负责什么</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>要做的事</th><th>动哪里</th><th>不用动哪里</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag mk">Maker</span>接一块新板子</td><td>一个板子文件填 <code>impo_board_t</code>；一个 sdkconfig 覆盖；在 <code>features</code> 里报它多出来的东西（陀螺仪、底盘）；登记到 board.sh / README。SparkBot 用了一个文件加两个小助手。</td><td>协议、网关、服务端、App、UI、语音管线。板子一注册，agent 就看见它的能力。</td></tr>
+      <tr><td><span class="tag mk">Maker</span>给板子加一条自己的命令</td><td>板子文件里的 <code>commands</code> 表：名字、给 agent 读的描述、参数、一个不阻塞的 <code>run</code>。</td><td>名字按 CAPABILITIES.md 的命名空间走；第二块板也要时，升格为公共命令并补契约。</td></tr>
+      <tr><td><span class="tag ag">Agent</span>改 agent 对 gadget 的行为</td><td>三个杠杆：服务端 prompt 里的 gadget 指令段（平台级）；每条命令自带的描述文字（Maker 级，这是 Maker 影响 agent 的方式）；skills/ 里的 SKILL.md（第三方设备级）。</td><td>agent 本身的工具框架、投递机制、沙箱。</td></tr>
+      <tr><td><span class="tag ag">Agent</span>接一台第三方设备（Sonos、Hue…）</td><td>写一份 SKILL.md 教 agent 用它的局域网协议；gadget 只当桥（隧道）。</td><td>固件对它一无所知；这是 Muse 的做法，隧道做好后 44 份上游 skill 直接复用。</td></tr>
+      <tr><td><span class="tag pl">平台</span>加一种新能力（比如观察流）</td><td>CAPABILITIES.md 先写契约 → 固件公共层 → 网关 → 服务端工具/worker → App。</td><td>任何板子文件。</td></tr>
+      <tr><td><span class="tag pl">平台</span>换 STT/TTS/视觉提供商</td><td>只改服务端 <code>voice/</code>，key 在服务端密钥库。</td><td>固件和网关：它们只认 <code>/tts</code> 和 <code>/voice/*</code> 接口。</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>和 Muse 上游的差别</h2>
+  <div class="grid">
+    <div class="card"><h3>Muse 有、我们保留</h3><ul><li>板子接口 + 一板一文件，AGENTS.md 让 coding agent 做移植</li><li>link.register 自报命令表（<code>commands_v2</code>）</li><li>skills/ 用 prompt 适配第三方设备，固件只当桥</li><li>Noise 加密会话、BLE 配对、OTA、隧道</li></ul></div>
+    <div class="card"><h3>Muse 留空、我们填上</h3><ul><li>回复朗读：上游 <code>start_tts</code> 是空位，我们接到 Gemini TTS（经网关 /tts）</li><li><code>speaker.say</code>、<code>speaker.play_url</code>、<code>camera.capture</code> 通用化、<code>imu.read</code>、<code>chassis.*</code></li><li>能力词汇表（契约）和 <code>capabilities</code> 摘要</li><li>内存预算：流式、用完即还</li></ul></div>
+    <div class="card"><h3>Muse 没有、我们新增</h3><ul><li><code>link.event</code>：gadget 主动开口</li><li>照片作为回合产物投递到 App</li><li>服务端基础能力（STT / TTS / 看图）全在 Impo，gadget 零第三方 key</li><li>计划：观察流 + 感知 worker</li></ul></div>
+  </div>
+
+  <p class="note">公开资料里 Muse Gadgets 由 Nat Friedman 于 2026-10-02 宣布，Home Link 是 ESP32-C5 的 USB 小棒、只跑官方固件；没有查到它来自哪家被收购公司或相关的架构访谈，所以这页没有引用那条线，分层全部来自代码。来源：<a href="https://techcrunch.com/2026/10/02/meta-wants-you-to-build-your-own-muse-gadget/">TechCrunch</a>、<a href="https://www.engadget.com/2276312/meta-muse-gadgets-open-source-smart-home-link/">Engadget</a>、<a href="https://mixed-news.com/en/meta-muse-gadgets-sdk-open-source-home-link-esp32-c5/">Mixed</a>。</p>
+</div>
+
+</body>
+</html>
