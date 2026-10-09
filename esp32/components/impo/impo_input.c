@@ -296,6 +296,42 @@ static void keyboard_buttons(unsigned ev)
 }
 
 /* A pairing prompt wakes the screen and keeps it on; otherwise idle sleeps. */
+/*
+ * A gadget whose saved network is gone (a move, a new router) would be
+ * unreachable for good without a button: after a while without it, open BLE
+ * phone setup by itself, so the app can give it the new network. Once per
+ * outage; turning phone setup off again is the person's choice.
+ */
+#define LOST_NETWORK_SETUP_S 60
+
+static void check_lost_network(void)
+{
+    static TickType_t lost_since;
+    static bool offered;
+    impo_wifi_status_t wifi;
+    impo_wifi_status(&wifi);
+    bool lost = wifi.state == IMPO_WIFI_NOT_NEARBY || wifi.state == IMPO_WIFI_FAILED;
+    if (!lost) {
+        lost_since = 0;
+        offered = false;
+        return;
+    }
+    TickType_t now = xTaskGetTickCount();
+    if (!lost_since) {
+        lost_since = now;
+    }
+    if (!offered && !impo_settings_ble_on() && now - lost_since >= pdMS_TO_TICKS(LOST_NETWORK_SETUP_S * 1000)) {
+        offered = true;
+        ESP_LOGI(TAG, "network %s for %d s: opening phone setup", wifi.state == IMPO_WIFI_FAILED ? "refused" : "not found",
+                 LOST_NETWORK_SETUP_S);
+        impo_settings_set_ble_on(true);
+        impo_ble_status_t b;
+        impo_ble_status(&b);
+        set_asleep(false, "lost network");
+        impo_state_set_caption("WI-FI NOT FOUND - SET IT UP IN THE APP: %s", b.name);
+    }
+}
+
 static void check_sleep(void)
 {
     impo_ble_status_t ble;
@@ -441,6 +477,7 @@ static void input_task(void *arg)
         if (now - checked >= pdMS_TO_TICKS(SLEEP_CHECK_MS)) {
             checked = now;
             check_sleep();
+            check_lost_network();
         }
 
         if (now - powered >= pdMS_TO_TICKS(paused ? REST_POWER_MS : POWER_MS)) {

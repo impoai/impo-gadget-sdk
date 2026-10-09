@@ -38,10 +38,10 @@ limitations under the License.
 >   [`esp32/components/impo/impo_commands.h`](esp32/components/impo/impo_commands.h).
 >
 > See [gadgets.impo.ai](https://gadgets.impo.ai) for what the Impo gateway
-> supports today. Pairing from the Impo app is not available yet, and the Impo
-> gateway neither issues nor requires SDK tokens, so skip the token steps and
-> ignore the token warnings. Muse is a trademark of Meta Platforms, Inc.; Impo
-> is not affiliated with or endorsed by Meta.
+> supports today. Gadgets pair from the Impo app (Settings > Gadgets) over
+> BLE; the Impo gateway neither issues nor requires SDK tokens, so skip the
+> token steps and ignore the token warnings. Muse is a trademark of Meta
+> Platforms, Inc.; Impo is not affiliated with or endorsed by Meta.
 
 Impo gadgets are open source devices you build yourself. Program an
 off-the-shelf ESP32 board or set up a Raspberry Pi with our device SDKs, then
@@ -99,6 +99,8 @@ upstream licenses:
 | Path | Upstream | License |
 |---|---|---|
 | [`esp32/components/minimp3/include/minimp3.h`](esp32/components/minimp3) | [lieff/minimp3](https://github.com/lieff/minimp3) | CC0-1.0, see [`LICENSE`](esp32/components/minimp3/LICENSE) |
+| [`esp32/components/bmi270/src/bmi270.c`](esp32/components/bmi270) and its headers | [espressif/esp-bsp](https://github.com/espressif/esp-bsp/tree/master/components/sensors/bmi270) | Apache-2.0, see [`LICENSE`](esp32/components/bmi270/LICENSE) |
+| [`esp32/components/bmi270/src/bmi260_config.h`](esp32/components/bmi270/src/bmi260_config.h) | Bosch Sensortec, via [ChromiumOS EC](https://chromium.googlesource.com/chromiumos/platform/ec/+/HEAD/third_party/bmi260/) | BSD-3-Clause, see [`LICENSE.bmi260`](esp32/components/bmi270/LICENSE.bmi260) |
 | [`esp32/main/pixel_font.c`](esp32/main/pixel_font.c) | Adafruit GFX `glcdfont.c` | BSD-2-Clause, in the file header |
 
 Dependencies fetched at build time are under their own licenses: ESP-IDF

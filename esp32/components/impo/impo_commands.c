@@ -67,7 +67,7 @@ static cJSON *show_text(const cJSON *params)
 {
     const cJSON *text = cJSON_GetObjectItem(params, "text");
     if (!cJSON_IsString(text) || !text->valuestring[0] || strlen(text->valuestring) > TEXT_MAX) {
-        return impo_command_error("invalid_param", "text must be 1 to 200 characters");
+        return impo_command_error("invalid_param", "text must be 1 to 200 bytes of UTF-8");
     }
     wake();
     impo_state_set_caption("%s", text->valuestring);
@@ -258,8 +258,9 @@ static cJSON *speaker_status(const cJSON *params)
 static const impo_command_t COMMON[] = {
     { "display.show_text",
       "Show a short line of text on the gadget's screen, under the avatar, until the next thing it "
-      "shows. Plain ASCII only: other characters are replaced or dropped. Wakes the screen.",
-      "{\"text\":{\"type\":\"string\",\"description\":\"1 to 200 characters of ASCII text.\"}}", NULL, show_text },
+      "shows. UTF-8; Chinese and Japanese show on gadgets built with the CJK font, as boxes on "
+      "others. Wakes the screen.",
+      "{\"text\":{\"type\":\"string\",\"description\":\"The text, up to 200 bytes (about 60 Chinese characters).\"}}", NULL, show_text },
     { "avatar.cheer",
       "Make the on-screen avatar hop happily for about two seconds, as it does when petted. Wakes the screen.",
       NULL, NULL, avatar_cheer },
