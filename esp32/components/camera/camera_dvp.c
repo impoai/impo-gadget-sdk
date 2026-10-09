@@ -34,8 +34,9 @@ static const char *TAG = "camera_dvp";
 #define FRAME_SIZE FRAMESIZE_VGA
 #define JPEG_QUALITY 12             /* the sensor's scale, 0 best */
 #define JPEG_QUALITY_ENCODE 80      /* esp_new_jpeg's scale, 100 best */
-/* The sensor's exposure settles over its first frames after a cold start. */
-#define WARMUP_FRAMES 3
+/* The sensor's exposure settles over its first frames after a cold start:
+ * about half a second's worth, more in a dark room. */
+#define WARMUP_FRAMES 10
 #define WARMUP_DELAY_MS 60
 
 static camera_dvp_config_t s_cfg;
@@ -76,19 +77,14 @@ static esp_err_t sensor_start(bool native_jpeg)
     return ESP_OK;
 }
 
-/*
- * The driver's buffer is handed back as soon as the pixels are copied out:
- * held for the seconds a JPEG takes to encode and send, the DMA has nowhere
- * to write and restarts out of step, after which every frame is shifted a
- * byte (every colour wrong) with blocks out of place.
- */
 typedef struct {
     uint8_t *jpeg;      /* a copy of the sensor's JPEG, or one encoded here */
 } frame_priv_t;
 
+/* Pixels copied 16-byte aligned, as the encoder wants them, in PSRAM. */
 static uint8_t *copy_of(const uint8_t *data, size_t len)
 {
-    uint8_t *copy = heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *copy = jpeg_calloc_align(len, 16);
     if (copy) {
         memcpy(copy, data, len);
     }
@@ -98,74 +94,86 @@ static uint8_t *copy_of(const uint8_t *data, size_t len)
 /*
  * RGB565 pixels (the sensor's byte order, high byte first) to a JPEG with
  * esp_new_jpeg, Espressif's encoder built on the S3's SIMD instructions: a
- * VGA frame in well under a second where esp32-camera's own takes two. The
- * encoder wants its input 16-byte aligned, so the pixels are copied into
- * such a buffer; `out` is the caller's to free.
+ * VGA frame in a quarter of a second. `out` is the caller's to free.
  */
-static bool encode(const uint8_t *pixels, size_t len, int width, int height, uint8_t **out, size_t *out_len)
+static esp_err_t encode(const uint8_t *aligned, size_t len, int width, int height, uint8_t **out, size_t *out_len)
 {
     *out = NULL;
     *out_len = 0;
-    uint8_t *aligned = jpeg_calloc_align(len, 16);
-    if (!aligned) {
-        return false;
-    }
-    memcpy(aligned, pixels, len);
     jpeg_enc_config_t cfg = DEFAULT_JPEG_ENC_CONFIG();
     cfg.width = width;
     cfg.height = height;
     cfg.src_type = JPEG_PIXEL_FORMAT_RGB565_BE;
     cfg.subsampling = JPEG_SUBSAMPLE_420;
     cfg.quality = JPEG_QUALITY_ENCODE;
-    jpeg_enc_handle_t enc = NULL;
     size_t cap = (size_t)width * height / 2;   /* ample at this quality */
     uint8_t *jpeg = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!jpeg) {
+        return ESP_ERR_NO_MEM;
+    }
+    jpeg_enc_handle_t enc = NULL;
+    jpeg_error_t err = jpeg_enc_open(&cfg, &enc);
     int produced = 0;
-    bool ok = jpeg && jpeg_enc_open(&cfg, &enc) == JPEG_ERR_OK
-              && jpeg_enc_process(enc, aligned, len, jpeg, cap, &produced) == JPEG_ERR_OK && produced > 0;
-    if (enc) {
+    if (err == JPEG_ERR_OK) {
+        err = jpeg_enc_process(enc, aligned, len, jpeg, cap, &produced);
         jpeg_enc_close(enc);
     }
-    jpeg_free_align(aligned);
-    if (!ok) {
+    if (err != JPEG_ERR_OK || produced <= 0) {
         free(jpeg);
-        return false;
+        ESP_LOGW(TAG, "encode: %d", (int)err);
+        return err == JPEG_ERR_NO_MEM ? ESP_ERR_NO_MEM : ESP_FAIL;
     }
     *out = jpeg;
     *out_len = produced;
-    return true;
+    return ESP_OK;
 }
 
-static bool s_started;
-
 /*
- * Starts the sensor the first time and leaves it running: on the ESP32-S3,
- * esp32-camera's deinit and a second init hand back frames shifted by a byte
- * (every colour wrong) with blocks out of place, so the sensor isn't stopped
- * between photos. It keeps drawing power meanwhile.
+ * One photo, start to finish, and the sensor stopped again whatever
+ * happens: its DMA buffers (internal RAM) and frame buffers (PSRAM) exist
+ * only for the second this takes. The pixels are copied out before the
+ * sensor stops and encoded afterwards, so the encoder's memory and the
+ * sensor's are never needed at once. The sensor's exposure settles over its
+ * first frames, so a few are skipped. A start that fails for memory is tried
+ * again shortly: internal RAM frees up as the network's work comes and goes.
  */
-static esp_err_t capture(camera_frame_t *out)
+#define START_TRIES 3
+#define START_RETRY_MS 150
+
+static esp_err_t start_with_retries(void)
 {
-    esp_err_t err = ESP_OK;
-    bool just_started = !s_started;
-    if (!s_started) {
+    esp_err_t err = ESP_FAIL;
+    for (int i = 0; i < START_TRIES; i++) {
         err = sensor_start(s_jpeg != JPEG_ENCODED);
         if (err == ESP_ERR_NOT_SUPPORTED && s_jpeg == JPEG_UNKNOWN) {
             /* The sensor was found but can't make JPEG: take raw pixels instead. */
             esp_camera_deinit();
             s_jpeg = JPEG_ENCODED;
             err = sensor_start(false);
-        } else if (err == ESP_OK && s_jpeg == JPEG_UNKNOWN) {
-            s_jpeg = JPEG_NATIVE;
         }
-        if (err != ESP_OK) {
-            return err == ESP_ERR_CAMERA_NOT_DETECTED ? ESP_ERR_TIMEOUT : err;
+        if (err == ESP_OK) {
+            if (s_jpeg == JPEG_UNKNOWN) {
+                s_jpeg = JPEG_NATIVE;
+            }
+            return ESP_OK;
         }
-        s_started = true;
+        if (err == ESP_ERR_CAMERA_NOT_DETECTED) {
+            return ESP_ERR_TIMEOUT;   /* no sensor answered: no point retrying */
+        }
+        vTaskDelay(pdMS_TO_TICKS(START_RETRY_MS));
+    }
+    return err == ESP_ERR_NO_MEM || err == ESP_FAIL ? ESP_ERR_NO_MEM : err;   /* esp32-camera says ESP_FAIL for a failed DMA malloc */
+}
+
+static esp_err_t capture(camera_frame_t *out)
+{
+    int64_t started = esp_timer_get_time();
+    esp_err_t err = start_with_retries();
+    if (err != ESP_OK) {
+        return err;
     }
     camera_fb_t *fb = NULL;
-    int64_t grab_started = esp_timer_get_time();
-    for (int i = 0; i <= (just_started ? WARMUP_FRAMES : 0); i++) {
+    for (int i = 0; i <= WARMUP_FRAMES; i++) {
         if (fb) {
             esp_camera_fb_return(fb);
             vTaskDelay(pdMS_TO_TICKS(WARMUP_DELAY_MS));
@@ -175,44 +183,54 @@ static esp_err_t capture(camera_frame_t *out)
             break;
         }
     }
-    ESP_LOGI(TAG, "frame in %lld ms", (long long)((esp_timer_get_time() - grab_started) / 1000));
-    if (!fb || !fb->len) {
-        if (fb) {
-            esp_camera_fb_return(fb);
-        }
+    uint8_t *pixels = NULL;
+    size_t len = 0;
+    int width = 0, height = 0;
+    bool native = false;
+    if (fb && fb->len) {
+        pixels = copy_of(fb->buf, fb->len);
+        len = fb->len;
+        width = fb->width;
+        height = fb->height;
+        native = fb->format == PIXFORMAT_JPEG;
+    }
+    if (fb) {
+        esp_camera_fb_return(fb);
+    }
+    esp_camera_deinit();   /* the sensor's memory goes back before the encoder's is taken */
+    int64_t grabbed = esp_timer_get_time();
+    if (!fb || !len) {
+        ESP_LOGW(TAG, "no frame from the sensor");
         return ESP_FAIL;
     }
-    frame_priv_t *priv = calloc(1, sizeof(*priv));
-    size_t len = 0;
-    int width = fb->width, height = fb->height;
-    int64_t started = esp_timer_get_time();
-    if (priv && fb->format == PIXFORMAT_JPEG) {
-        priv->jpeg = copy_of(fb->buf, fb->len);
-        len = fb->len;
-        esp_camera_fb_return(fb);
-    } else if (priv) {
-        /* The encoder copies the frame itself, so the buffer goes straight back. */
-        uint8_t *pixels = copy_of(fb->buf, fb->len);
-        size_t pixels_len = fb->len;
-        esp_camera_fb_return(fb);
-        if (pixels) {
-            encode(pixels, pixels_len, width, height, &priv->jpeg, &len);
-            free(pixels);
-        }
-        ESP_LOGI(TAG, "%dx%d encoded to %u bytes in %lld ms", width, height, (unsigned)len,
-                 (long long)((esp_timer_get_time() - started) / 1000));
-    } else {
-        esp_camera_fb_return(fb);
-    }
-    if (!priv || !priv->jpeg || !len) {
-        if (priv) {
-            free(priv->jpeg);
-        }
-        free(priv);
+    if (!pixels) {
         return ESP_ERR_NO_MEM;
     }
+    frame_priv_t *priv = calloc(1, sizeof(*priv));
+    if (!priv) {
+        jpeg_free_align(pixels);
+        return ESP_ERR_NO_MEM;
+    }
+    size_t jpeg_len = 0;
+    if (native) {
+        priv->jpeg = heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (priv->jpeg) {
+            memcpy(priv->jpeg, pixels, len);
+            jpeg_len = len;
+        }
+        err = priv->jpeg ? ESP_OK : ESP_ERR_NO_MEM;
+    } else {
+        err = encode(pixels, len, width, height, &priv->jpeg, &jpeg_len);
+    }
+    jpeg_free_align(pixels);
+    if (err != ESP_OK) {
+        free(priv);
+        return err;
+    }
+    ESP_LOGI(TAG, "%dx%d: sensor %lld ms, encode %lld ms, %u bytes", width, height,
+             (long long)((grabbed - started) / 1000), (long long)((esp_timer_get_time() - grabbed) / 1000), (unsigned)jpeg_len);
     out->jpeg = priv->jpeg;
-    out->len = len;
+    out->len = jpeg_len;
     out->width = width;
     out->height = height;
     out->priv = priv;

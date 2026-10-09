@@ -26,8 +26,9 @@ extern "C" {
 /*
  * A parallel (DVP) sensor on the chip's camera interface, driven by
  * esp32-camera: the ESP-SparkBot's OV2640 or GC2145. A sensor that can't
- * make JPEG itself hands over RGB565, encoded here. The sensor is started at
- * the first photo and left running (see camera_dvp.c). It can't stream.
+ * make JPEG itself hands over RGB565, encoded here. The sensor is started
+ * for each photo and stopped again, so it holds no memory and draws no
+ * power between photos. It can't stream.
  */
 
 typedef struct {

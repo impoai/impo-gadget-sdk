@@ -42,7 +42,8 @@ if(CONFIG_IMPO_ENABLED)
         "impo_lv_mem.c"
         "impo_link.c"
         "impo_ble.c"
-        "impo_commands.c")
+        "impo_commands.c"
+        "impo_sound.c")
     if(CONFIG_IMPO_HATCH)
         list(APPEND srcs "impo_chat.c" "impo_account_api.c" "impo_chat_session.cpp")
         list(APPEND embed "test_reply.mp3")   # impo_hatch_mp3_selftest

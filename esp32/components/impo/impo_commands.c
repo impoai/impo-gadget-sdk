@@ -30,14 +30,12 @@
 #include "impo_camera.h"
 #include "impo_chat.h"
 #include "impo_settings.h"
+#include "impo_sound.h"
 #include "impo_state.h"
-#include "impo_voice.h"
 
 static const char *TAG = "impo_commands";
 
 #define TEXT_MAX 200
-#define SOUND_MAX_BYTES (1536 * 1024)   /* an MP3 of a minute at 192 kbps */
-#define SOUND_MAX_SECONDS 60
 #define SOUND_TIMEOUT_MS 15000
 #define SAY_MAX_CHARS 1000
 
@@ -108,27 +106,22 @@ static cJSON *beep(const cJSON *params)
 }
 
 /*
- * speaker.play_url: the MP3 is fetched and decoded on a task of its own,
- * then handed to the voice loop; the command returns at once and
- * speaker.status says how it went. One sound at a time.
+ * speaker.play_url: a task of its own streams the file into impo_sound as it
+ * downloads, so the memory is the module's fixed buffers whatever the
+ * file's length; the decoder plays it as it comes. The command returns at
+ * once and speaker.status says how it goes.
  */
-static struct {
-    volatile bool busy;           /* fetching or decoding */
-    char state[16];               /* "idle", "fetching", "decoding", "playing", "failed" */
-    char error[64];
-} s_sound = { .state = "idle" };
+#define SOUND_MAX_BYTES (1536 * 1024)   /* an MP3 of a minute at 192 kbps */
+#define SOUND_WRITE_WAIT_MS 20000       /* for room: the decoder frees it as it plays */
 
-static void sound_set(const char *state, const char *error)
-{
-    strlcpy(s_sound.state, state, sizeof(s_sound.state));
-    strlcpy(s_sound.error, error ? error : "", sizeof(s_sound.error));
-}
+static volatile bool s_fetching;
 
-/* Fetches `url` into PSRAM, up to SOUND_MAX_BYTES; the caller frees *out. */
-static esp_err_t fetch(const char *url, uint8_t **out, size_t *len, const char **error)
+static void sound_task(void *arg)
 {
-    *out = NULL;
-    *len = 0;
+    char *url = arg;
+    const char *error = NULL;
+    size_t total = 0;
+    uint8_t *chunk = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     const esp_http_client_config_t cfg = {
         .url = url,
         .crt_bundle_attach = esp_crt_bundle_attach,
@@ -136,88 +129,55 @@ static esp_err_t fetch(const char *url, uint8_t **out, size_t *len, const char *
         .buffer_size = 2048,
         .buffer_size_tx = 512,
     };
-    esp_http_client_handle_t http = esp_http_client_init(&cfg);
+    esp_http_client_handle_t http = chunk ? esp_http_client_init(&cfg) : NULL;
+    esp_err_t err = http ? esp_http_client_open(http, 0) : ESP_ERR_NO_MEM;
     if (!http) {
-        *error = "out of memory";
-        return ESP_ERR_NO_MEM;
-    }
-    esp_err_t err = esp_http_client_open(http, 0);
-    if (err == ESP_OK) {
+        error = "out of memory";
+    } else if (err != ESP_OK) {
+        error = "the URL could not be reached";
+    } else {
         esp_http_client_fetch_headers(http);
         int status = esp_http_client_get_status_code(http);
         int64_t announced = esp_http_client_get_content_length(http);
         if (status != 200) {
-            *error = "the URL did not answer with the sound";
-            err = ESP_FAIL;
+            error = "the URL did not answer with the sound";
         } else if (announced > SOUND_MAX_BYTES) {
-            *error = "the sound is too large";
-            err = ESP_ERR_INVALID_SIZE;
+            error = "the sound is too large";
         }
-    } else {
-        *error = "the URL could not be reached";
     }
-    size_t cap = SOUND_MAX_BYTES, have = 0;
-    uint8_t *buf = err == ESP_OK ? heap_caps_malloc(cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : NULL;
-    if (err == ESP_OK && !buf) {
-        *error = "out of memory";
-        err = ESP_ERR_NO_MEM;
-    }
-    while (err == ESP_OK) {
-        int n = esp_http_client_read(http, (char *)buf + have, (int)(cap - have));
+    impo_sound_begin("url");
+    while (!error) {
+        int n = esp_http_client_read(http, (char *)chunk, 4096);
         if (n < 0) {
-            *error = "the download broke off";
-            err = ESP_FAIL;
+            error = "the download broke off";
         } else if (n == 0) {
             break;
-        } else if ((have += n) == cap && !esp_http_client_is_complete_data_received(http)) {
-            *error = "the sound is too large";
-            err = ESP_ERR_INVALID_SIZE;
+        } else if ((total += n) > SOUND_MAX_BYTES) {
+            error = "the sound is too large";
+        } else if (!impo_sound_write(chunk, n, SOUND_WRITE_WAIT_MS)) {
+            char why[64];
+            error = strcmp(impo_sound_status(why, sizeof(why)), "failed") ? "stopped" : "the sound could not be decoded";
         }
     }
-    esp_http_client_close(http);
-    esp_http_client_cleanup(http);
-    if (err != ESP_OK || !have) {
-        free(buf);
-        if (err == ESP_OK) {
-            *error = "the sound is empty";
-            err = ESP_FAIL;
-        }
-        return err;
+    if (http) {
+        esp_http_client_close(http);
+        esp_http_client_cleanup(http);
     }
-    *out = buf;
-    *len = have;
-    return ESP_OK;
-}
-
-static void sound_task(void *arg)
-{
-    char *url = arg;
-    uint8_t *mp3 = NULL;
-    size_t len = 0;
-    const char *error = NULL;
-    sound_set("fetching", NULL);
-    esp_err_t err = fetch(url, &mp3, &len, &error);
-    if (err == ESP_OK) {
-        sound_set("decoding", NULL);
-        int16_t *pcm = NULL;
-        size_t n = impo_hatch_mp3_decode(mp3, len, SOUND_MAX_SECONDS, &pcm);
-        free(mp3);
-        if (n) {
-            ESP_LOGI(TAG, "playing %u bytes of MP3, %.1f s", (unsigned)len, n / 16000.0);
-            sound_set("playing", NULL);
-            impo_state_poke();
-            impo_voice_play(pcm, n);
-        } else {
-            error = "the sound is not an MP3 this gadget can decode";
-            err = ESP_FAIL;
-        }
+    free(chunk);
+    if (!error && !total) {
+        error = "the sound is empty";
     }
-    if (err != ESP_OK) {
+    if (error) {
         ESP_LOGW(TAG, "%s: %s", error, url);
-        sound_set("failed", error);
+        if (strcmp(error, "stopped")) {
+            impo_sound_fail(error);
+        }
+    } else {
+        ESP_LOGI(TAG, "fetched %u bytes of sound", (unsigned)total);
+        impo_sound_end(true);
     }
     free(url);
-    s_sound.busy = false;
+    s_fetching = false;
     vTaskDeleteWithCaps(NULL);
 }
 
@@ -230,22 +190,22 @@ static cJSON *play_url(const cJSON *params)
     if (!impo_settings_speaker_on()) {
         return impo_command_error("speaker_off", "the speaker is turned off in the gadget's settings");
     }
-    if (s_sound.busy) {
+    if (s_fetching) {
         return impo_command_error("busy", "another sound is still being fetched");
     }
     char *copy = strdup(url->valuestring);
     if (!copy) {
         return impo_command_error("out_of_memory", "no memory for the request");
     }
-    s_sound.busy = true;
-    if (xTaskCreateWithCaps(sound_task, "sound", 6144, copy, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
-        s_sound.busy = false;
+    s_fetching = true;
+    if (xTaskCreateWithCaps(sound_task, "sound_url", 6144, copy, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+        s_fetching = false;
         free(copy);
         return impo_command_error("out_of_memory", "no memory for the request");
     }
     cJSON *result = impo_command_ok();
     cJSON_AddStringToObject(result, "status", "fetching");
-    cJSON_AddStringToObject(result, "note", "the sound plays once fetched and decoded; speaker.status reports progress");
+    cJSON_AddStringToObject(result, "note", "the sound plays as it arrives; speaker.status reports progress");
     return result;
 }
 
@@ -271,20 +231,19 @@ static cJSON *speaker_say(const cJSON *params)
 static cJSON *speaker_stop(const cJSON *params)
 {
     (void)params;
-    impo_voice_stop();
+    impo_sound_stop();
     return impo_command_ok();
 }
 
 static cJSON *speaker_status(const cJSON *params)
 {
     (void)params;
-    if (!strcmp(s_sound.state, "playing") && !impo_voice_playing()) {
-        sound_set("idle", NULL);
-    }
+    char error[64];
+    const char *status = impo_sound_status(error, sizeof(error));
     cJSON *result = impo_command_ok();
-    cJSON_AddStringToObject(result, "status", s_sound.state);
-    if (s_sound.error[0]) {
-        cJSON_AddStringToObject(result, "error", s_sound.error);
+    cJSON_AddStringToObject(result, "status", status);
+    if (error[0]) {
+        cJSON_AddStringToObject(result, "error", error);
     }
     cJSON_AddNumberToObject(result, "volume_percent", impo_settings_volume());
     cJSON_AddBoolToObject(result, "speaker_on", impo_settings_speaker_on());
@@ -318,8 +277,8 @@ static const impo_command_t COMMON[] = {
       NULL, speaker_say },
     { "speaker.stop", "Stop the sound speaker.say or speaker.play_url is playing.", NULL, NULL, speaker_stop },
     { "speaker.status",
-      "Whether the speaker is on, its volume, and what became of the last speaker.play_url: "
-      "fetching, decoding, playing, idle or failed (with the reason).",
+      "Whether the speaker is on, its volume, and what became of the last speaker.say or "
+      "speaker.play_url: fetching, playing, idle or failed (with the reason).",
       NULL, NULL, speaker_status },
 };
 

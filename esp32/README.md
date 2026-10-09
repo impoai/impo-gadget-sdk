@@ -264,8 +264,8 @@ A few things worth knowing:
 
 Every gadget with the full UI also offers `speaker.say` (a text spoken in
 Impo's voice, through the same `POST /tts`), `speaker.play_url` (an MP3 from a
-public https URL, up to 1.5 MB and about a minute, fetched and decoded on the
-gadget), `speaker.stop` and `speaker.status`. Beyond those, the SparkBot offers its account `chassis.drive`,
+public https URL, up to 1.5 MB, streamed and decoded on the gadget as it
+downloads), `speaker.stop` and `speaker.status`. Beyond those, the SparkBot offers its account `chassis.drive`,
 `chassis.move`, `chassis.stop`, `chassis.dance`, `chassis.set_light` and
 `chassis.status` for the optional tracked base, `imu.read` for its motion
 sensor and `camera.capture` for its camera. The base stops itself half a

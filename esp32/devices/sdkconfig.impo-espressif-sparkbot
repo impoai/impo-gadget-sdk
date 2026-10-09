@@ -71,12 +71,13 @@ CONFIG_PM_PROFILING=y
 CONFIG_HOMEHUB_PAIRING_AUTO_CONFIRM=y
 
 # The camera's DMA goes through internal RAM in pieces small enough for what
-# is left of it once Wi-Fi, BLE and the UI are up. DMA straight into PSRAM
+# is left of it once Wi-Fi, BLE, Link and the UI are up (the largest free
+# block was 15 KB on the bench). DMA straight into PSRAM
 # (CONFIG_CAMERA_PSRAM_DMA) loses its place whenever the CPU is busy in PSRAM,
 # which it is while a photo is encoded: every frame after the first came back
 # scrambled below its first rows.
 # CONFIG_CAMERA_PSRAM_DMA is not set
-CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX=16384
+CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX=8192
 
 # Replies in Chinese show as characters, not boxes: Unifont's CJK glyphs,
 # 850 KB of the app slot's 4 MB.

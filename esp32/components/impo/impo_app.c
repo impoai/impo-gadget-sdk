@@ -27,6 +27,7 @@
 #include "impo_chat.h"
 #include "impo_input.h"
 #include "impo_settings.h"
+#include "impo_sound.h"
 #include "impo_state.h"
 #include "impo_ui.h"
 #include "impo_voice.h"
@@ -85,6 +86,9 @@ void impo_app_run(const impo_board_t *board)
     } else if (impo_voice_start(q) != ESP_OK) {
         ESP_LOGE(TAG, "voice pipeline unavailable");
     } else {
+        if (impo_sound_init() != ESP_OK) {
+            ESP_LOGE(TAG, "no memory for sounds: speaker.say and speaker.play_url are off");
+        }
         impo_state_set_mode(IMPO_MODE_IDLE);
         impo_state_set_caption("%s", "");   /* the button icons say how to talk */
     }

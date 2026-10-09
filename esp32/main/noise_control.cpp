@@ -1496,20 +1496,6 @@ static void queue_result(noise_ctrl_session_generation_t session_generation,
     }
 }
 
-// A link.event: {"method":"link.event","params":{"event":..., "data":{...}}}, no reply expected.
-static char *wrap_event_json(cJSON *params) {
-    cJSON *root = cJSON_CreateObject();
-    if (!root || !cJSON_AddStringToObject(root, "method", "link.event")) {
-        cJSON_Delete(root);
-        cJSON_Delete(params);
-        return nullptr;
-    }
-    cJSON_AddItemToObject(root, "params", params);
-    char *json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
 static void noise_ota_status(const ota_event_t *ev, void *user) {
     auto *ctx = static_cast<ota_ctx *>(user);
     cJSON *result = cJSON_CreateObject();
@@ -1570,6 +1556,12 @@ static void send_device_health(
                             heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(metrics, "heap_free_psram",
                             heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    // The largest piece matters more than the total: DMA buffers (the camera's)
+    // need contiguous internal RAM, and it fragments.
+    cJSON_AddNumberToObject(metrics, "heap_largest_internal",
+                            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(metrics, "heap_largest_psram",
+                            heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
     cJSON *battery_pct = nullptr, *battery_mv = nullptr;
     cJSON *charging = nullptr, *usb_power = nullptr;
 #if CONFIG_IMPO_ENABLED
@@ -1721,7 +1713,22 @@ static void handle_invoke_request(
 
 // ---- result → JSON envelope -------------------------------------------------
 
+// A link.result for request_id, or with no request_id a link.event whose
+// params the result holds (noise_ctrl_send_event).
 static char *wrap_result_json(const char *request_id, cJSON *result) {
+    if (!request_id) {
+        // {"method":"link.event","params":{"event":..., "data":{...}}}, no reply expected.
+        cJSON *event = cJSON_CreateObject();
+        if (!event || !cJSON_AddStringToObject(event, "method", "link.event")) {
+            cJSON_Delete(event);
+            cJSON_Delete(result);
+            return nullptr;
+        }
+        cJSON_AddItemToObject(event, "params", result);
+        char *json = cJSON_PrintUnformatted(event);
+        cJSON_Delete(event);
+        return json;
+    }
     cJSON *root = cJSON_CreateObject();
     auto fail = [&]() -> char * {
         cJSON_Delete(root);
@@ -2203,7 +2210,7 @@ static session_result_t run_session(stack_monitor_t *stack) {
             }
             // wrap_result_json consumes the result tree. Retain its output
             // directly; there is no second whole-message allocation/copy.
-            char *json = pr.request_id ? wrap_result_json(pr.request_id, pr.result) : wrap_event_json(pr.result);
+            char *json = wrap_result_json(pr.request_id, pr.result);
             free(pr.request_id);
             if (json) {
                 control_tx = {json, strlen(json), 0, false, session_generation};

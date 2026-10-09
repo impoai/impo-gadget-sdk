@@ -69,7 +69,7 @@ extern "C" {
 #include "impo_account_api.h"
 #include "impo_link.h"
 #include "impo_settings.h"
-#include "impo_voice.h"
+#include "impo_sound.h"
 #include "impo_wifi.h"
 }
 #include "impo_chat_priv.h"
@@ -190,17 +190,13 @@ struct stream_t {
 static stream_t s_streams[MAX_STREAMS];
 
 /*
- * speaker.say: a text spoken outside any turn. Its WAV is gathered whole on
- * its own K_TTS stream (msg SAY_MSG), then resampled and handed to the voice
- * loop (impo_voice_play), which plays it when free.
+ * speaker.say: a text spoken outside any turn. Its WAV streams from its own
+ * K_TTS stream (msg SAY_MSG) into impo_sound as it arrives; the socket is
+ * held off while that has no room (see poll_socket).
  */
 #define SAY_MSG (-2)
-#define SAY_MAX (1536 * 1024)              /* ~30 s of 24 kHz WAV */
-static struct {
-    int64_t id;              /* the stream, or 0 */
-    uint8_t *wav;            /* SAY_MAX, while a say is in flight */
-    size_t len;
-} s_say;
+#define SAY_POLL_ROOM (SCRATCH + 4096)   /* stop reading the socket below this much room */
+static int64_t s_say_id;                 /* the stream, or 0 */
 
 /* ---- The current turn ---- */
 
@@ -1592,80 +1588,40 @@ static bool wav_header(const uint8_t *data, size_t len, int *rate, int *channels
 
 static void say_drop(void)
 {
-    if (s_say.id) {
-        send_reset(s_say.id);
-        close_stream(find_stream(s_say.id));
+    if (s_say_id) {
+        send_reset(s_say_id);
+        close_stream(find_stream(s_say_id));
+        s_say_id = 0;
     }
-    free(s_say.wav);
-    s_say = {};
 }
 
 static void say_begin(const char *text)
 {
     say_drop();
-    s_say.wav = (uint8_t *)psram_alloc(SAY_MAX);
-    if (!s_say.wav) {
-        ESP_LOGW(TAG, "say: no memory");
-        return;
-    }
-    s_say.id = request_speech(text, SAY_MSG);
-    if (!s_say.id) {
+    impo_sound_begin("say");
+    s_say_id = request_speech(text, SAY_MSG);
+    if (!s_say_id) {
         ESP_LOGW(TAG, "say: the request could not be sent");
-        say_drop();
+        impo_sound_fail("Impo could not be asked");
     }
 }
 
 static void say_data(const uint8_t *data, size_t len)
 {
-    if (s_say.len + len > SAY_MAX) {
-        len = SAY_MAX - s_say.len;
+    if (!impo_sound_write(data, len, 50)) {
+        ESP_LOGW(TAG, "say: dropped %u bytes", (unsigned)len);
     }
-    memcpy(s_say.wav + s_say.len, data, len);
-    s_say.len += len;
 }
 
-/* The whole WAV is here: 16 kHz mono for the voice loop, which frees it. */
 static void say_end(bool ok)
 {
-    int rate = 0, channels = 0;
-    size_t skip = 0;
-    if (!ok || !wav_header(s_say.wav, s_say.len, &rate, &channels, &skip)) {
-        ESP_LOGW(TAG, "say: %s", ok ? "not a 16-bit PCM WAV" : "no speech came back");
-        say_drop();
-        return;
+    s_say_id = 0;
+    if (!ok) {
+        ESP_LOGW(TAG, "say: no speech came back");
+        impo_sound_fail("no speech came back");
+    } else {
+        impo_sound_end(true);
     }
-    size_t frame_bytes = 2 * channels;
-    size_t frames = (s_say.len - skip) / frame_bytes;
-    size_t cap = (size_t)((uint64_t)frames * MIC_RATE / rate) + 16;
-    int16_t *out = (int16_t *)psram_alloc(cap * sizeof(int16_t));
-    if (!out) {
-        say_drop();
-        return;
-    }
-    resampler_t rs;
-    resampler_init(&rs, rate, MIC_RATE);
-    size_t n = 0;
-    const uint8_t *in = s_say.wav + skip;
-    for (size_t done = 0; done < frames;) {
-        size_t take = frames - done < MINIMP3_MAX_SAMPLES_PER_FRAME / 2 ? frames - done : MINIMP3_MAX_SAMPLES_PER_FRAME / 2;
-        for (size_t k = 0; k < take; k++) {
-            const uint8_t *f = in + (done + k) * frame_bytes;
-            int16_t l = (int16_t)(f[0] | f[1] << 8);
-            int16_t r = channels == 2 ? (int16_t)(f[2] | f[3] << 8) : l;
-            s_pcm[k] = (int16_t)((l + r) / 2);
-        }
-        size_t got = resample(&rs, s_pcm, take, s_pcm16);
-        if (n + got > cap) {
-            got = cap - n;
-        }
-        memcpy(out + n, s_pcm16, got * sizeof(int16_t));
-        n += got;
-        done += take;
-    }
-    ESP_LOGI(TAG, "say: %u bytes of WAV at %d Hz -> %.1f s", (unsigned)s_say.len, rate, n / (double)MIC_RATE);
-    s_say.id = 0;   /* the stream is already closed */
-    say_drop();
-    impo_voice_play(out, n);
 }
 
 static void start_tts(void)
@@ -2098,6 +2054,10 @@ static bool poll_socket(void)
     for (int budget = 0; budget < 8; budget++) {
         /* Hold off while the MP3 buffer is nearly full: TCP pushes back on the VM. */
         if (s_turn.tts_msg >= 0 && MP3_BUF - s_turn.mp3_len < MP3_POLL_ROOM) {
+            return true;
+        }
+        /* Likewise for a say's WAV, which impo_sound takes as it plays. */
+        if (s_say_id && impo_sound_room() < SAY_POLL_ROOM) {
             return true;
         }
         ssize_t n = ws_recv(s_conn.tls, s_conn.rx, SCRATCH, false);

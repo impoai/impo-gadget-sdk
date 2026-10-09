@@ -164,6 +164,28 @@ repeat of the same event from the same gadget within three seconds.
 A board sends one with `impo_link_send_event(name, data)`; a new event name
 gets a row here first.
 
+## Memory
+
+One ESP32-S3 holds Wi-Fi, BLE, TLS, the UI, the Link session and the voice
+session before any capability gets a byte, and what is left (about 40 KB of
+internal RAM in pieces, a few MB of PSRAM) is shared by all of them. So a
+capability's memory is decided up front, not taken when used:
+
+| Capability | Memory | When |
+|---|---|---|
+| Replies spoken (`tts_data` → `decode`) | 512 KB PSRAM ring + decoder | at start-up, once |
+| `speaker.say`, `speaker.play_url` (`impo_sound`) | 160 KB in + 64 KB out, PSRAM; a 32 KB decoder task | at start-up, once |
+| `camera.capture` | 2 × 614 KB frames in PSRAM, 8 KB DMA pieces in internal RAM, a 614 KB copy and a 150 KB JPEG | for the second a photo takes, then given back |
+| `imu.read`, the motion watcher | a 3 KB task | at start-up |
+
+Rules that keep it that way: stream, never buffer a whole file (a sound of
+any length costs the same); release what a command took before it returns
+(the camera stops after each photo); never let a worst-case constant size an
+allocation; and tell memory failures apart from bad data in the error. The
+numbers to watch are `heap_largest_internal` and `heap_largest_psram` in
+`device.health`: the largest piece, not the total, is what a DMA buffer or
+a frame needs.
+
 ## Adding to this
 
 - A new board implements existing capabilities through `impo_board_t`
