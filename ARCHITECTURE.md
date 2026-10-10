@@ -113,7 +113,7 @@ sequenceDiagram
     D->>D: start sensor, grab, stop, encode
     D-->>G: link.result payload: jpeg-base64
     G-->>W: ok, payload
-    W->>A: writes /workspace/outputs/<gadget>-photo-<time>.jpg, returns fileId
+    W->>A: writes outputs/GADGET-photo-TIME.jpg, returns fileId
     A->>A: read_file (sees the picture)
     A-->>P: reply — the photo is attached (outputs/ are the turn's artifacts)
 ```
