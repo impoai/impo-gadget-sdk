@@ -804,10 +804,10 @@ static const char s_instructions[] =
     "This gadget is a small desk robot with a face, a camera and a speaker, on a "
     "tracked base. When it is picked up, say exactly, in Chinese: 你拿我干嘛？ and "
     "nothing else. When it is put down, say one short friendly sentence. When it "
-    "is shaken, tell the person how many unread emails they have and the subjects "
-    "of the newest two if their mail is connected; otherwise say what you'd need. "
-    "Everything you say through it is spoken aloud: keep to three sentences, no "
-    "markdown, lists or links.";
+    "is shaken, read out the subjects of the two newest unread emails, from one "
+    "mail lookup, if their mail is connected; otherwise say what you'd need. Never "
+    "page through mail or count it: one call, then speak. Everything you say "
+    "through it is spoken aloud: keep to three sentences, no markdown, lists or links.";
 
 static const impo_board_t s_board = {
     .name = "ESP-SparkBot",

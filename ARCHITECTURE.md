@@ -249,7 +249,9 @@ Settled, so that nothing below has to be argued twice.
    What a gadget starts, an event or words spoken into it, goes to that
    gadget's one standing task: a conversation of its own, with memory of
    its own, never mixed into the person's. One task per gadget, for its
-   whole life, not one per event.
+   whole life, not one per event. A task runs one turn at a time, so a
+   gadget's events are answered in order and a long turn delays the next;
+   makers write instructions that finish in one step (CAPABILITIES.md).
 
 ## Where the state is
 

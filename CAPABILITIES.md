@@ -57,6 +57,10 @@ what the device said when it connected.
   a gadget can ask, never override, and it has no access of its own. The
   gateway refuses a registration over these limits (`invalid_instructions`,
   `invalid_events`), so a firmware that writes too much finds out at once.
+  A gadget's task answers one thing at a time: while the agent works on one
+  event, the next waits. So ask for what one lookup can answer ("the subjects
+  of the two newest unread mails"), not for what takes a tour ("how many
+  unread mails"): a long turn leaves the gadget mute until it ends.
 - `capabilities`: a summary for apps and prompts, without listing commands:
 
 ```json
