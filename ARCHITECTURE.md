@@ -192,13 +192,16 @@ went and names the URL it tried.
 
 Settled, so that nothing below has to be argued twice.
 
-1. **Fail fast, everywhere.** A command to a gadget that is offline fails
-   now, and the agent says so. An event whose reply doesn't come gets no
-   reply. A scheduled task whose gadget is away is skipped and logged. A
-   watch that loses its connection ends, and the person starts it again if
-   they want it. Nothing is queued, retried, given an expiry or made up
-   later: the platform records what failed, and that is the whole
-   mechanism.
+1. **The platform and the agent fail fast.** A command to a gadget that is
+   offline fails now, and the agent says so. An event whose reply doesn't
+   come gets no reply. A scheduled task whose gadget is away is skipped and
+   logged. A watch that loses its connection ends, and the person starts it
+   again if they want it. Above the gadget nothing is queued, retried,
+   given an expiry or made up later: the platform records what failed, and
+   that is the whole mechanism. Firmware is free to retry inside one
+   command's own time (a DMA buffer that wasn't there a moment ago, a
+   sensor that needs a second poke): that is hardware's business, and the
+   command still answers once, success or failure, within its timeout.
 2. **Contention is handled the same way.** A new sound replaces the one
    playing (`impo_sound`); the screen shows the last thing written; the
    base takes one drive at a time and a second one fails as busy. No
