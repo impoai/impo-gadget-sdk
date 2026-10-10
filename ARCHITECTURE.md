@@ -103,7 +103,7 @@ sequenceDiagram
     participant W as API/worker
     participant G as Gateway
     participant D as Gadget
-    P->>A: "take a photo with my robot"
+    P->>A: take a photo with my robot
     A->>W: impo_list_gadgets
     W->>G: GET /admin/vms/:vm
     G-->>A: gadgets, capabilities, commands
@@ -111,11 +111,11 @@ sequenceDiagram
     W->>G: POST /admin/vms/:vm/invoke
     G->>D: link.invoke camera.capture
     D->>D: start sensor, grab, stop, encode
-    D-->>G: link.result {payload: jpeg-base64}
+    D-->>G: link.result payload: jpeg-base64
     G-->>W: ok, payload
     W->>A: writes /workspace/outputs/<gadget>-photo-<time>.jpg, returns fileId
     A->>A: read_file (sees the picture)
-    A-->>P: reply; the photo is attached (outputs/ are the turn's artifacts)
+    A-->>P: reply — the photo is attached (outputs/ are the turn's artifacts)
 ```
 
 The worker turns the base64 into a sandbox file because the model reads
@@ -132,14 +132,14 @@ sequenceDiagram
     participant W as API
     participant A as Agent
     D->>G: POST /api/voice/dictation (24 kHz PCM, while held)
-    G->>W: /conversation/voice-messages (WAV) → transcript, submission
-    W-->>G: ack {messageId, text}
-    G-->>D: chat/stream ack; captions show the transcript
+    G->>W: /conversation/voice-messages (WAV) to transcript, submission
+    W-->>G: ack messageId, text
+    G-->>D: chat/stream ack — captions show the transcript
     W->>A: the message, in the person's main conversation
     A-->>W: reply text (streamed)
     W-->>G: submission stream (text deltas)
-    G-->>D: chat/subscribe: message_start, text_append…, message_done
-    D->>G: POST /tts {text} (start_tts, per message)
+    G-->>D: chat/subscribe: message_start, text_append..., message_done
+    D->>G: POST /tts text (start_tts, per message)
     G->>W: /voice/speech (service token)
     W-->>G: WAV (Gemini TTS)
     G-->>D: the WAV as the stream body
@@ -161,16 +161,16 @@ sequenceDiagram
     participant W as API
     participant A as Agent
     D->>D: motion watcher: off upright for 1.5 s (debounced)
-    D->>G: link.event {event: picked_up, data: {orientation}}
-    G->>G: drop a repeat within 3 s; keep the last 50
-    G->>W: /conversation/messages "[Gadget event] <name>: picked_up (…)"
+    D->>G: link.event event: picked_up, data: orientation
+    G->>G: drop a repeat within 3 s — keep the last 50
+    G->>W: /conversation/messages Gadget event name: picked_up (...)
     W->>A: the message (the prompt says what it is and to answer briefly)
     A->>W: may call imu.read or others first
     A-->>W: reply
     W-->>G: submission stream
     G->>G: collects the reply text
-    G->>D: link.invoke speaker.say {text}
-    D->>G: POST /tts … (as above)
+    G->>D: link.invoke speaker.say text
+    D->>G: POST /tts ... (as above)
 ```
 
 Today every event goes to the main conversation. `docs/GADGET-AGENTS.md`
