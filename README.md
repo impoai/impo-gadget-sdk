@@ -65,6 +65,11 @@ agents like [Muse Code](https://developer.meta.com/ai/lp/muse-code/).
 
 ## How it fits together
 
+[`ARCHITECTURE.md`](ARCHITECTURE.md) is the full account: components, what
+trusts what, the protocol surfaces, the four flows (a command, a voice turn,
+an event, a sound) as sequence diagrams, where state lives and where to
+extend. The short version:
+
 Three layers, each adapted by different people:
 
 | Layer | Where | Who adapts it |
