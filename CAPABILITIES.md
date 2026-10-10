@@ -35,12 +35,28 @@ contract.
 
 ## How a gadget says what it has
 
-`link.register` carries two things:
+`link.register` carries four things, all written in the firmware. Nothing
+about a gadget is configured on a server: what the agent knows of a device is
+what the device said when it connected.
 
 - `commands_v2`: every command the gadget runs, each with a description the
   agent reads and `required` / `optional` parameters (`{"type", "description"}`
   each). The agent calls a command with exactly these parameters; a result is
   `{"ok": true, "payload": {...}}` or `{"ok": false, "error": "..."}`.
+- `events`: the events it sends (below), each with what it means on this
+  device: `[{"name": "picked_up", "description": "Someone lifted the robot
+  off the desk, most likely to talk to it."}]`. At most 16, descriptions up
+  to 200 characters.
+- `instructions`: the maker's words to the agent that owns the gadget, in
+  plain language, up to 1500 characters: what the device is for and what to
+  do when its events arrive ("When it is picked up, greet them and read their
+  next calendar event. Everything you say is spoken aloud: three sentences,
+  no markdown."). The agent carries them out with whatever the person has
+  connected (mail, calendar, other gadgets) and says so when something is
+  missing. They sit below the person's own wishes and the platform's rules:
+  a gadget can ask, never override, and it has no access of its own. The
+  gateway refuses a registration over these limits (`invalid_instructions`,
+  `invalid_events`), so a firmware that writes too much finds out at once.
 - `capabilities`: a summary for apps and prompts, without listing commands:
 
 ```json
@@ -58,8 +74,11 @@ contract.
 (`chassis.*`), `lights` (lights the agent can set), `touch_pads`,
 `environment_sensors` (`sensors.read`).
 
-The Impo server shows `capabilities` with each gadget in `impo_list_gadgets`;
-the gateway keeps it with the registration.
+The Impo server shows `capabilities`, `events` and `instructions` with each
+gadget in `impo_list_gadgets`; the gateway keeps them with the registration
+and quotes the event's meaning and the instructions with every `link.event`
+it passes on. A board fills them in `impo_board_t.events` and
+`impo_board_t.instructions`.
 
 ## The vocabulary
 
@@ -162,8 +181,14 @@ repeat of the same event from the same gadget within three seconds.
 | `picked_up` | `motion_sensor` | `orientation` it ended up in |
 | `put_down` | `motion_sensor` | `orientation` (upright) |
 
-A board sends one with `impo_link_send_event(name, data)`; a new event name
-gets a row here first.
+A board sends one with `impo_link_send_event(name, data)` and describes it
+in `impo_board_t.events`; a new event name gets a row here first.
+
+What happens next is the agent's call, guided by the gadget's
+`instructions`. A reaction that needs no judgement (a sound, a fixed phrase,
+a light) belongs in the firmware itself: `speaker.say` through the platform's
+TTS, or a local file through `impo_sound`; it is instant and works without
+the agent. An event is for what needs the person's context.
 
 ## Memory
 

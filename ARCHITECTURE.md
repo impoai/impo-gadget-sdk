@@ -230,6 +230,14 @@ Settled, so that nothing below has to be argued twice.
 6. **Things that move need a person's say-so.** Nothing automated drives
    the base or anything else that moves unless the person asked for that
    behaviour explicitly (the `physical` grant in `docs/GADGET-AGENTS.md`).
+7. **A gadget speaks for itself; the agent decides.** Everything the agent
+   knows about a device, its commands, its events and its maker's
+   `instructions`, is written in the firmware and arrives with
+   `link.register`; nothing is configured per device on a server. The
+   instructions can ask for anything ("when shaken, read the newest mail"),
+   because the gadget has no access of its own: the agent carries them out
+   with the person's connections, under the person's wishes and the
+   platform's rules. The security boundary is the agent, not the device.
 
 ## Where the state is
 
@@ -248,7 +256,8 @@ Settled, so that nothing below has to be argued twice.
 | A board | one file filling `impo_board_t`, a `sdkconfig` overlay, a line in `board.sh`/`ports.py`/`Kconfig`/the tables (`esp32/components/impo/boards/README.md`) | protocol, gateway, API, app |
 | A command for one board | that board's `commands` table | — |
 | A command every board shares | `impo_commands.c` + a row in CAPABILITIES.md | the gateway (it passes any name through) |
-| An event | `impo_link_send_event` from the board + a row in CAPABILITIES.md | the gateway (it passes any name through) |
+| An event | `impo_link_send_event` from the board, its meaning in `impo_board_t.events` + a row in CAPABILITIES.md | the gateway (it passes any name through) |
+| What a device is for, what to do on its events | `impo_board_t.instructions` in the board file (maker) | the agent's own instructions (platform) |
 | A capability needing new plumbing (a stream) | CAPABILITIES.md first, then firmware, gateway, API, app | board files |
 | A third-party device | a `skills/*/SKILL.md` | firmware |
 | How the agent treats gadgets | `gadgetInstructions` in `impo/server/src/tools/gadget-tools.ts` (platform), each command's description (maker), skills (device) | — |

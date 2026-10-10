@@ -56,6 +56,15 @@ typedef struct {
     int16_t x, y;
 } impo_button_hint_t;
 
+/* An event a board sends (CAPABILITIES.md, Events), described for the agent. */
+typedef struct {
+    const char *name;           /* "picked_up" */
+    const char *description;    /* what it means on this device, one sentence */
+} impo_event_t;
+
+#define IMPO_INSTRUCTIONS_MAX 1500      /* the gateway refuses longer */
+#define IMPO_EVENTS_MAX 16
+
 typedef struct {
     const char *name;
     int width, height;
@@ -109,6 +118,15 @@ typedef struct {
     /* What else the board has, for the capabilities it registers (CAPABILITIES.md):
      * a comma-separated list such as "motion_sensor,locomotion,lights", or NULL. */
     const char *features;
+    /* The events this board sends with impo_link_send_event(), each with what
+     * it means on this device, for the agent that gets it; may be left out. */
+    const impo_event_t *events;
+    int event_count;
+    /* The gadget's instructions to the agent that owns it: what the device is
+     * for and what to do when its events arrive, in plain language, at most
+     * IMPO_INSTRUCTIONS_MAX characters. The person's own wishes come first,
+     * so write what the device is meant to do, not rules. NULL: none. */
+    const char *instructions;
 } impo_board_t;
 
 /* The running board, set by impo_app_run(). */

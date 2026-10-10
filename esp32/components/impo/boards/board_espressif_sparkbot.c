@@ -792,6 +792,23 @@ static const impo_command_t s_commands[] = {
       NULL, NULL, imu_read },
 };
 
+/* What the agent is told about this device (CAPABILITIES.md, "How a gadget
+ * says what it has"). The person's own instructions come first. */
+static const impo_event_t s_events[] = {
+    { "picked_up", "Someone lifted the robot off the desk, most likely to talk to it or take it along." },
+    { "put_down", "The robot was set back down on a flat surface." },
+    { "shaken", "The robot was shaken; strength is gentle or hard. A hard shake means someone wants its attention now." },
+};
+
+static const char s_instructions[] =
+    "This gadget is a small desk robot with a face, a camera and a speaker, on a "
+    "tracked base. When it is picked up, say exactly, in Chinese: 你拿我干嘛？ and "
+    "nothing else. When it is put down, say one short friendly sentence. When it "
+    "is shaken, tell the person how many unread emails they have and the subjects "
+    "of the newest two if their mail is connected; otherwise say what you'd need. "
+    "Everything you say through it is spoken aloud: keep to three sentences, no "
+    "markdown, lists or links.";
+
 static const impo_board_t s_board = {
     .name = "ESP-SparkBot",
     .width = LCD_RES,
@@ -818,6 +835,9 @@ static const impo_board_t s_board = {
     .commands = s_commands,
     .command_count = sizeof(s_commands) / sizeof(s_commands[0]),
     .features = "motion_sensor,touch_pads,locomotion,lights",
+    .events = s_events,
+    .event_count = sizeof(s_events) / sizeof(s_events[0]),
+    .instructions = s_instructions,
 };
 
 /* Home Link's app_main starts Impo with this board (main/main.c). */

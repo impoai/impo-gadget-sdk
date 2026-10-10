@@ -332,6 +332,22 @@ void impo_commands_capabilities(cJSON *params)
         }
         list = end ? end + 1 : list + len;
     }
+
+    /* The board's own words to the agent: its events and what to make of them. */
+    if (impo_board->events && impo_board->event_count > 0) {
+        cJSON *events = cJSON_AddArrayToObject(params, "events");
+        int count = impo_board->event_count < IMPO_EVENTS_MAX ? impo_board->event_count : IMPO_EVENTS_MAX;
+        for (int i = 0; i < count; i++) {
+            const impo_event_t *event = &impo_board->events[i];
+            cJSON *entry = cJSON_CreateObject();
+            cJSON_AddStringToObject(entry, "name", event->name);
+            cJSON_AddStringToObject(entry, "description", event->description ? event->description : "");
+            cJSON_AddItemToArray(events, entry);
+        }
+    }
+    if (impo_board->instructions && *impo_board->instructions) {
+        cJSON_AddStringToObject(params, "instructions", impo_board->instructions);
+    }
 }
 
 void impo_commands_describe(cJSON *commands)
