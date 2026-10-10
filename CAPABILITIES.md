@@ -169,9 +169,10 @@ base answered the gadget, which proves the link, not the movement.
 ## Events
 
 The gadget can call the agent too: `link.event` on the control stream, with
-`{"event": "<name>", "data": {...}, "uptime_ms"}`. The gateway tells the agent
-as a message from the gadget ("[Gadget event] Desk Bot: shaken (peak_g=2.3,
-strength=hard)"), and the agent's reply is spoken by the gadget. Events are
+`{"event": "<name>", "data": {...}, "uptime_ms"}`. The gateway posts it to the
+gadget's own standing task ("[Gadget event] Desk Bot: shaken (peak_g=2.3,
+strength=hard)", plus what the board says it means), never to the person's
+conversation, and the agent's reply is spoken by the gadget. Events are
 for things worth a remark, debounced on the gadget; the gateway ignores a
 repeat of the same event from the same gadget within three seconds.
 

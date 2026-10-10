@@ -67,9 +67,10 @@ ever on a gadget.
   open for the control messages.
 - **Gateway → API**: the gateway speaks to the Impo API with a service
   token and `X-Impo-Gadget-Subject: <route>`; the API allows that pair only
-  `POST /conversation/messages`, `/conversation/voice-messages`,
-  `/voice/speech` and reading those submissions. Everything else needs the
-  person's own session.
+  to open a task, post text or speech to a task (`POST /tasks`,
+  `/tasks/:id/messages`, `/tasks/:id/voice-messages`), `/voice/speech`, and
+  reading those submissions. It can never write to the person's own
+  conversation. Everything else needs the person's own session.
 - **API → gateway**: admin routes (`/admin/vms/:vm/...`) with the admin
   token, used by the API for pairings, listing and invoking.
 - **Agent → gadget**: only through `impo_gadget_command`, which checks the
@@ -132,10 +133,10 @@ sequenceDiagram
     participant W as API
     participant A as Agent
     D->>G: POST /api/voice/dictation (24 kHz PCM, while held)
-    G->>W: /conversation/voice-messages (WAV) to transcript, submission
+    G->>W: /tasks/:id/voice-messages (WAV) to transcript, submission
     W-->>G: ack messageId, text
     G-->>D: chat/stream ack — captions show the transcript
-    W->>A: the message, in the person's main conversation
+    W->>A: the message, in the gadget's standing task
     A-->>W: reply text (streamed)
     W-->>G: submission stream (text deltas)
     G-->>D: chat/subscribe: message_start, text_append..., message_done
@@ -163,8 +164,8 @@ sequenceDiagram
     D->>D: motion watcher: off upright for 1.5 s (debounced)
     D->>G: link.event event: picked_up, data: orientation
     G->>G: drop a repeat within 3 s — keep the last 50
-    G->>W: /conversation/messages Gadget event name: picked_up (...)
-    W->>A: the message (the prompt says what it is and to answer briefly)
+    G->>W: /tasks/:id/messages Gadget event picked_up, what it means here
+    W->>A: the message, in the gadget's standing task
     A->>W: may call imu.read or others first
     A-->>W: reply
     W-->>G: submission stream
@@ -173,10 +174,15 @@ sequenceDiagram
     D->>G: POST /tts ... (as above)
 ```
 
-Today every event goes to the main conversation. `docs/GADGET-AGENTS.md`
-puts a router in front: events go first to the person's gadget agents that
-subscribed to them, and to the conversation only when none did. A reply
-that doesn't come is simply not spoken (Decisions, 1).
+Nothing from a gadget enters the person's conversation. Each gadget has
+one standing task on the Impo side (Decisions, 8): the gateway opens it on
+the gadget's first word with the maker's `instructions` and `events` as the
+opening message, keeps its id with the registration, and posts every event
+and every spoken sentence to it. The task's agent has the person's
+connections and the gadget's commands as tools; what it answers is spoken
+by the gadget. The task appears in the app's task list under the gadget's
+name, so the person can read what passed between them. A reply that doesn't
+come is simply not spoken (Decisions, 1).
 
 ### A sound: "play this"
 
@@ -238,13 +244,19 @@ Settled, so that nothing below has to be argued twice.
    because the gadget has no access of its own: the agent carries them out
    with the person's connections, under the person's wishes and the
    platform's rules. The security boundary is the agent, not the device.
+8. **Who starts it decides where it goes.** What the person says to the
+   agent, in the app or by asking it to use a gadget, is their conversation.
+   What a gadget starts, an event or words spoken into it, goes to that
+   gadget's one standing task: a conversation of its own, with memory of
+   its own, never mixed into the person's. One task per gadget, for its
+   whole life, not one per event.
 
 ## Where the state is
 
 | State | Where | Notes |
 |---|---|---|
 | Pairing, Wi-Fi, settings | the gadget's NVS | `pairing.json`, networks, volume, BLE on/off |
-| Pairings, device registrations, last 50 messages and events | the account's Durable Object storage | the gateway's only state; stateless tokens |
+| Pairings, device registrations (with each gadget's task id), last 50 messages and events | the account's Durable Object storage | the gateway's only state; stateless tokens |
 | Conversations, memory, attachments, gadget list cache | the API's Postgres and S3 | the gadget list is read from the gateway each time |
 | The agent's files | the Rebyte sandbox | `/workspace/outputs/` is delivered; the rest is scratch |
 | Nothing | third-party services | STT/TTS requests carry no identity and store nothing (`store: false`) |
