@@ -143,6 +143,7 @@ base answered the gadget, which proves the link, not the movement.
 | Command | Who has it | Parameters | Result payload |
 |---|---|---|---|
 | `device.health` | every gadget | — | `{"overall", "metrics": {uptime, heap, battery_pct, battery_mv, charging, usb_power}, "network_ssid", "version"}` |
+| `device.set_name` | every gadget | `name` (1–32 characters) | — ; the gadget stores the name, reconnects under it, and the account's gadget list shows it from then on |
 | `device.discover` | gadgets with the tunnel | — | devices found on the home network |
 | `device.ota` | gadgets with OTA on | `url`, `force`? | — (not offered to the agent) |
 

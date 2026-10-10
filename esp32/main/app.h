@@ -58,6 +58,8 @@ void app_ble_companion_set(bool advertise);
 bool app_confirm_pairing_press(void);
 // Full setup reset and reboot, from a worker task.
 void app_reset_setup_async(void);
+// Drops the gateway session so it reconnects and registers again (after a rename).
+void app_request_reconnect(void);
 #endif
 
 #if CONFIG_IMPO_ENABLED || CONFIG_HOMEHUB_VOICE

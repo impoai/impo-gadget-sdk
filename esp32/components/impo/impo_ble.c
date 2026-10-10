@@ -149,6 +149,10 @@ static void run_command(char *cmd)
         } else {
             impo_settings_set_wifi("", "");   /* every saved network */
         }
+    } else if (!strcmp(cmd, "name")) {
+        if (!impo_link_set_display_name(v)) {
+            res = "error: 1 to 32 printable characters";
+        }
     } else if (!strcmp(cmd, "hatch.host")) {
         impo_settings_set_hatch_host(v);
     } else if (!strcmp(cmd, "hatch.vm")) {

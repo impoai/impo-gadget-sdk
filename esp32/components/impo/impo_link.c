@@ -76,6 +76,11 @@ bool impo_link_talk_press(void)
     return s_ops && s_ops->talk_press && s_ops->talk_press();
 }
 
+bool impo_link_set_display_name(const char *name)
+{
+    return s_ops && s_ops->set_display_name && s_ops->set_display_name(name);
+}
+
 bool impo_link_send_event(const char *event, cJSON *data)
 {
     if (s_ops && s_ops->send_event) {

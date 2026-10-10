@@ -1288,6 +1288,13 @@ static char *build_register_json(void) {
 #endif
 
     cJSON *commands = cJSON_CreateObject();
+    cJSON *name_required = cJSON_CreateObject();
+    cJSON_AddItemToObject(name_required, "name", string_param("The new name, 1 to 32 characters."));
+    add_command(commands, "device.set_name",
+                "Rename this gadget: the name the person calls it by, shown in the app and "
+                "used to tell their gadgets apart. 1 to 32 characters. The gadget reconnects "
+                "under the new name a moment later.",
+                name_required, nullptr);
     add_command(commands, "device.health",
                 "Report basic Link health, including battery level (percent), "
                 "voltage, and whether it is charging or on USB power; each is "
@@ -2396,6 +2403,10 @@ extern "C" void noise_ctrl_set_command_cb(noise_ctrl_command_cb cb) {
 
 extern "C" void noise_ctrl_set_power_save(bool on) {
     s_power_save = on;
+}
+
+extern "C" void noise_ctrl_set_display_name(const char *display_name) {
+    strncpy(s_display_name, display_name ? display_name : "", sizeof(s_display_name) - 1);
 }
 
 extern "C" void noise_ctrl_set_host(const char *host) {

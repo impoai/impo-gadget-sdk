@@ -1594,6 +1594,7 @@ typedef enum {
     WS_CONTROL_SET_VM,
     WS_CONTROL_RESET_VM,
     WS_CONTROL_UNPAIR,
+    WS_CONTROL_RECONNECT,   // drop the session so it registers again (a new name)
 } ws_control_action_t;
 
 typedef struct {
@@ -1607,6 +1608,7 @@ static const char *ws_control_action_name(ws_control_action_t action) {
         case WS_CONTROL_SET_VM: return "device.set_vm";
         case WS_CONTROL_RESET_VM: return "device.reset_vm";
         case WS_CONTROL_UNPAIR: return "device.unpair";
+        case WS_CONTROL_RECONNECT: return "device.set_name";
         default: return "unknown";
     }
 }
@@ -1701,6 +1703,12 @@ static void ws_control_task(void *arg) {
             break;
         case WS_CONTROL_RESET_VM:
             reset_default_vm_with_gate_held();
+            break;
+        case WS_CONTROL_RECONNECT:
+            // The keeper reconnects to the same VM (s_impo_resume_vm) and the
+            // session registers afresh, name included.
+            noise_ctrl_disconnect();
+            s_impo_resume_vm = true;
             break;
         case WS_CONTROL_UNPAIR:
             if (args->setup_credentials_cleared) {
@@ -1839,6 +1847,11 @@ static cJSON *bug_report_command(
 }
 #endif
 
+void app_request_reconnect(void) {
+    cJSON *result = queue_ws_control(WS_CONTROL_RECONNECT, NULL);
+    cJSON_Delete(result);
+}
+
 static cJSON *on_ws_command(
     const char *command, cJSON *params, const char *request_id,
     noise_ctrl_session_generation_t session_generation) {
@@ -1916,6 +1929,15 @@ static cJSON *on_ws_command(
 #endif
     if (strcmp(command, "device.reset_vm") == 0) {
         return queue_ws_control(WS_CONTROL_RESET_VM, NULL);
+    }
+    if (strcmp(command, "device.set_name") == 0) {
+        cJSON *name = cJSON_GetObjectItem(params, "name");
+        if (!cJSON_IsString(name) || !identity_set_display_name(name->valuestring)) {
+            return command_error("invalid_param", "name must be 1 to 32 printable characters");
+        }
+        noise_ctrl_set_display_name(identity_display_name());
+        ESP_LOGI(TAG, "renamed to \"%s\"", identity_display_name());
+        return queue_ws_control(WS_CONTROL_RECONNECT, NULL);
     }
     if (strcmp(command, "device.unpair") == 0) {
         return queue_ws_control(WS_CONTROL_UNPAIR, NULL);
@@ -2543,6 +2565,7 @@ void app_run(void) {
     heap_snapshot("after wifi_mgr_init");
 
     noise_ctrl_init(identity_node_id(), identity_ble_name(), on_ws_control_status);
+    noise_ctrl_set_display_name(identity_display_name());   // the name the person gave it, if any
     noise_ctrl_set_command_cb(on_ws_command);
     noise_ctrl_set_agent_name_cb(led_status_set_title);
     heap_snapshot("after noise_ctrl_init");

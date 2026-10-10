@@ -16,6 +16,8 @@
 
 #include "identity.h"
 
+#include "config_store.h"
+
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -56,6 +58,27 @@ void identity_init(void) {
 
 const char *identity_node_id(void) { return s_node_id; }
 const char *identity_ble_name(void) { return s_ble_name; }
+
+#define DISPLAY_NAME_KEY "display_name"
+static char s_display_name[33];
+
+const char *identity_display_name(void) {
+    if (!s_display_name[0] && !config_get_str(DISPLAY_NAME_KEY, s_display_name, sizeof(s_display_name))) {
+        return s_ble_name;
+    }
+    return s_display_name[0] ? s_display_name : s_ble_name;
+}
+
+bool identity_set_display_name(const char *name) {
+    size_t n = name ? strlen(name) : 0;
+    if (!n || n > sizeof(s_display_name) - 1) return false;
+    for (size_t i = 0; i < n; i++) {
+        if ((unsigned char)name[i] < 0x20 || name[i] == 0x7f) return false;
+    }
+    if (!config_set_str(DISPLAY_NAME_KEY, name)) return false;
+    strlcpy(s_display_name, name, sizeof(s_display_name));
+    return true;
+}
 const char *identity_mac(void) { return s_mac; }
 const char *identity_device_id(void) { return s_device_id; }
 const char *identity_sdk_token(void) {

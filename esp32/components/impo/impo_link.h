@@ -78,6 +78,8 @@ typedef struct {
     void (*wifi_forget)(const char *ssid);        /* one saved network; empty forgets them all */
     /* A link.event to the gateway (takes `data`); false when it couldn't go. */
     bool (*send_event)(const char *event, cJSON *data);
+    /* The gadget's name, kept and registered again; false if it can't be. */
+    bool (*set_display_name)(const char *name);
 } impo_link_ops_t;
 
 void impo_link_register(const impo_link_ops_t *ops);
@@ -100,6 +102,9 @@ void impo_link_reset_setup(void);
  * send only what is worth a reply, debounced. False when it couldn't go.
  */
 bool impo_link_send_event(const char *event, cJSON *data);
+
+/* Renames the gadget ("name=" over BLE or the console, device.set_name from the agent). */
+bool impo_link_set_display_name(const char *name);
 /* The first saved network, owned by Link. Return false when Link hasn't registered. */
 bool impo_link_wifi_get(char *ssid, char *pass);
 bool impo_link_wifi_set(const char *ssid, const char *pass);

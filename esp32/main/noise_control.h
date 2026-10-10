@@ -69,6 +69,8 @@ void noise_ctrl_set_agent_name_cb(noise_ctrl_agent_name_cb cb);
 
 // Override the Noise host. NULL or empty restores the compiled default.
 void noise_ctrl_set_host(const char *host);
+// The display_name the next link.register carries.
+void noise_ctrl_set_display_name(const char *display_name);
 
 // Off (the default), the session checks for traffic every tick. On, once it
 // has been quiet POWER_SAVE_QUIET_MS, every POWER_SAVE_POLL_MS instead, so the

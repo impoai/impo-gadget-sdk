@@ -379,6 +379,13 @@ static void op_reset_setup(void) {
     app_reset_setup_async();
 }
 
+static bool op_set_display_name(const char *name) {
+    if (!identity_set_display_name(name)) return false;
+    noise_ctrl_set_display_name(identity_display_name());
+    app_request_reconnect();   // registers again under the new name
+    return true;
+}
+
 static const impo_link_ops_t s_ops = {
     .wifi_status = op_wifi_status,
     .wifi_apply = op_wifi_apply,
@@ -402,6 +409,7 @@ static const impo_link_ops_t s_ops = {
     .wifi_saved = op_wifi_saved,
     .wifi_forget = op_wifi_forget,
     .send_event = noise_ctrl_send_event,
+    .set_display_name = op_set_display_name,
 };
 
 // ---- Keeper: joins a saved network and applies BLE, on an internal stack ----
