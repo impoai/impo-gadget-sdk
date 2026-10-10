@@ -115,10 +115,9 @@ A run:
 4. The run is logged (`gadget_agent_runs`: trigger, actions, result, cost,
    duration) and `state` is written back.
 
-Arbitration in the kernel path, because several things may want the gadget
-at once: a person's own voice turn wins over any agent; one sound at a time
-on a speaker (a later `say` waits, then plays, or is dropped if older than
-30 s); physical commands need `allow.physical`; quiet hours per gadget.
+No arbitration: a new sound replaces the one playing, a busy base fails the
+second drive, and a run whose gadget is offline fails and is logged
+(ARCHITECTURE.md, Decisions). Physical commands need `allow.physical`.
 
 ## Making one
 
@@ -158,11 +157,12 @@ Nothing changes on the gadget for the first phase: `link.event` exists,
 commands exist. The gateway stops posting events as chat messages itself and
 posts them to `POST /api/v1/gadgets/events`, which routes. Later phases add:
 
-- `camera.watch {fps, seconds}`: an observation stream. The gadget pushes
-  frames on a stream; a perception worker (a cheap vision model plus change
-  detection) turns them into events (`scene_changed`, `person_seen`) that
-  trigger gadget agents like any other event. The main agent is never in
-  the frame loop.
+- `watch.start {what, seconds, fps}` / `watch.stop`: the watching mode.
+  The gadget streams observations; a perception worker (a cheap vision
+  model plus change detection) turns them into events (`scene_changed`,
+  `person_seen`) that trigger gadget agents like any other event. The
+  stream itself is shown live and not kept. The main agent is never in the
+  frame loop.
 - `link.event` names from the vocabulary get filters in triggers
   (`data.strength == "hard"`).
 
@@ -170,11 +170,11 @@ posts them to `POST /api/v1/gadgets/events`, which routes. Later phases add:
 
 1. **Rules only.** Event router, `gadget_agents` table, `rules` kind, the
    create/update/delete/list API, the main agent's tools, the app list with
-   a switch. Covers "when shaken play X", "when picked up say Y", schedules
+   a switch. Runs fail fast and are logged; nothing is retried. Covers "when shaken play X", "when picked up say Y", schedules
    that say or show something. A week of work across API, worker, app.
-2. **LLM agents.** Bounded sessions with allowlisted tools; the arbitration
-   rules; run logs in the app. "Read me my first meeting when picked up."
-3. **Observation.** `camera.watch`, the perception worker, scene events.
+2. **LLM agents.** Bounded sessions with allowlisted tools; run logs in the
+   app. "Read me my first meeting when picked up."
+3. **Watching.** `watch.*`, the perception worker, scene events.
    "Tell me when someone comes in."
 4. **Sharing.** A gallery of gadget agents by board (the Dreamer gallery for
    hardware): "install the Desk Companion pack for the SparkBot".

@@ -175,7 +175,8 @@ sequenceDiagram
 
 Today every event goes to the main conversation. `docs/GADGET-AGENTS.md`
 puts a router in front: events go first to the person's gadget agents that
-subscribed to them, and to the conversation only when none did.
+subscribed to them, and to the conversation only when none did. A reply
+that doesn't come is simply not spoken (Decisions, 1).
 
 ### A sound: "play this"
 
@@ -186,6 +187,46 @@ buffers were allocated once at start-up. `speaker.say` streams the gateway's
 WAV into the same module. The voice loop plays whatever is there when it is
 free; a new sound replaces the old; `speaker.status` tells how the last one
 went and names the URL it tried.
+
+## Decisions
+
+Settled, so that nothing below has to be argued twice.
+
+1. **Fail fast, everywhere.** A command to a gadget that is offline fails
+   now, and the agent says so. An event whose reply doesn't come gets no
+   reply. A scheduled task whose gadget is away is skipped and logged. A
+   watch that loses its connection ends, and the person starts it again if
+   they want it. Nothing is queued, retried, given an expiry or made up
+   later: the platform records what failed, and that is the whole
+   mechanism.
+2. **Contention is handled the same way.** A new sound replaces the one
+   playing (`impo_sound`); the screen shows the last thing written; the
+   base takes one drive at a time and a second one fails as busy. No
+   priorities, no arbitration service.
+3. **Only the platform is always on.** The agent is woken per turn, a
+   phone is online when it is in the foreground, a gadget is connected
+   but fragile. So routing, records and the gadget list live in the
+   platform; the agent is not responsible for reliability, and a gadget
+   keeps only what it needs to behave on its own (a motion watcher, a
+   base that stops itself).
+4. **A desktop is a client and a gadget at once.** The desktop app
+   carries the Linux gadget runtime (`linux/`, the `impogadget` package)
+   as an embedded daemon: one account, one process, two identities. It
+   registers its capabilities (`system.run`, `file.*`, and in time the
+   screen, camera and microphone) like any gadget, and the Linux box, the
+   desktop and the ESP32 firmware speak the same `link.*` messages, so
+   consistency is in the code, not in a document.
+5. **Watching is a mode, not a message.** A gadget at rest sends discrete,
+   debounced events (`link.event`). Watching (`watch.start`, with what,
+   how long, how often, and `watch.stop`) is a state it enters on request,
+   streams observations from, and leaves on a timeout, low battery or a
+   stop. What it streams is shown to the person live and not written into
+   the conversation or kept; only the discrete events a perception worker
+   derives from it ("someone came in") reach the agent, like any other
+   event.
+6. **Things that move need a person's say-so.** Nothing automated drives
+   the base or anything else that moves unless the person asked for that
+   behaviour explicitly (the `physical` grant in `docs/GADGET-AGENTS.md`).
 
 ## Where the state is
 
@@ -232,4 +273,4 @@ In the order they unblock each other:
    at it).
 4. Prebuilt firmware per board, flashed from a web page.
 5. The tunnel on the gateway, which makes ring 3 real.
-6. `camera.watch` and the perception worker.
+6. `watch.*`, the observation stream and the perception worker (Decisions, 5).
