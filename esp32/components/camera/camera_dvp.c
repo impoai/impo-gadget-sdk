@@ -134,34 +134,41 @@ static esp_err_t encode(const uint8_t *aligned, size_t len, int width, int heigh
  * only for the second this takes. The pixels are copied out before the
  * sensor stops and encoded afterwards, so the encoder's memory and the
  * sensor's are never needed at once. The sensor's exposure settles over its
- * first frames, so a few are skipped. A start that fails, fails: the result
- * says why and the agent can ask again.
+ * first frames, so a few are skipped. A start that fails for memory is tried
+ * again shortly: internal RAM frees up as the network's work comes and goes.
  */
-static esp_err_t start(void)
+#define START_TRIES 3
+#define START_RETRY_MS 150
+
+static esp_err_t start_with_retries(void)
 {
-    esp_err_t err = sensor_start(s_jpeg != JPEG_ENCODED);
-    if (err == ESP_ERR_NOT_SUPPORTED && s_jpeg == JPEG_UNKNOWN) {
-        /* The sensor was found but can't make JPEG: take raw pixels instead. */
-        esp_camera_deinit();
-        s_jpeg = JPEG_ENCODED;
-        err = sensor_start(false);
-    }
-    if (err == ESP_OK) {
-        if (s_jpeg == JPEG_UNKNOWN) {
-            s_jpeg = JPEG_NATIVE;
+    esp_err_t err = ESP_FAIL;
+    for (int i = 0; i < START_TRIES; i++) {
+        err = sensor_start(s_jpeg != JPEG_ENCODED);
+        if (err == ESP_ERR_NOT_SUPPORTED && s_jpeg == JPEG_UNKNOWN) {
+            /* The sensor was found but can't make JPEG: take raw pixels instead. */
+            esp_camera_deinit();
+            s_jpeg = JPEG_ENCODED;
+            err = sensor_start(false);
         }
-        return ESP_OK;
+        if (err == ESP_OK) {
+            if (s_jpeg == JPEG_UNKNOWN) {
+                s_jpeg = JPEG_NATIVE;
+            }
+            return ESP_OK;
+        }
+        if (err == ESP_ERR_CAMERA_NOT_DETECTED) {
+            return ESP_ERR_TIMEOUT;   /* no sensor answered: no point retrying */
+        }
+        vTaskDelay(pdMS_TO_TICKS(START_RETRY_MS));
     }
-    if (err == ESP_ERR_CAMERA_NOT_DETECTED) {
-        return ESP_ERR_TIMEOUT;
-    }
-    return err == ESP_FAIL ? ESP_ERR_NO_MEM : err;   /* esp32-camera says ESP_FAIL for a failed DMA malloc */
+    return err == ESP_ERR_NO_MEM || err == ESP_FAIL ? ESP_ERR_NO_MEM : err;   /* esp32-camera says ESP_FAIL for a failed DMA malloc */
 }
 
 static esp_err_t capture(camera_frame_t *out)
 {
     int64_t started = esp_timer_get_time();
-    esp_err_t err = start();
+    esp_err_t err = start_with_retries();
     if (err != ESP_OK) {
         return err;
     }
