@@ -132,8 +132,12 @@ class LinkTransportContractTest(unittest.TestCase):
         upgrade = _function_body(source, "static noise_upgrade_result_t ws_upgrade(")
 
         self.assertIn('"link.register"', register)
-        self.assertIn('"device_family", "link"', register)
-        self.assertIn('"model_id", "esp-link"', register)
+        self.assertIn('"device_family", NOISE_CTRL_DEVICE_FAMILY', register)
+        self.assertIn('"model_id", NOISE_CTRL_MODEL_ID', register)
+        # ESP32 builds still register as an esp32 "link" device.
+        self.assertIn('#define NOISE_CTRL_PLATFORM "esp32"', source)
+        self.assertIn('#define NOISE_CTRL_DEVICE_FAMILY "link"', source)
+        self.assertIn('#define NOISE_CTRL_MODEL_ID "esp-link"', source)
         self.assertIn('"device.health"', register)
         self.assertIn('"device.discover"', register)
         self.assertIn('"timeout_ms"', register)
