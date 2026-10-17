@@ -66,6 +66,17 @@ else()
     endif()
 endif()
 
+# A custom gadget's product ID, as the Impo developer platform issues it.
+# Empty sends none.
+string(LENGTH "${CONFIG_GADGET_PRODUCT_ID}" GADGET_PRODUCT_ID_LENGTH)
+if(NOT GADGET_PRODUCT_ID_LENGTH EQUAL 0 AND
+   (GADGET_PRODUCT_ID_LENGTH LESS 2 OR GADGET_PRODUCT_ID_LENGTH GREATER 40 OR
+    NOT "${CONFIG_GADGET_PRODUCT_ID}" MATCHES "^[a-z0-9-]+$"))
+    message(FATAL_ERROR
+        "CONFIG_GADGET_PRODUCT_ID \"${CONFIG_GADGET_PRODUCT_ID}\" is not a product ID: "
+        "2 to 40 characters of a-z, 0-9 and -. Copy it from the product on the Impo developer platform.")
+endif()
+
 # Manufacturer attestation must remain inaccessible to unsigned firmware.
 # Community pairing is independent of logging, OTA signing, and board selection.
 if(CONFIG_HOMEHUB_PAIRING_EFUSE_AUTH)

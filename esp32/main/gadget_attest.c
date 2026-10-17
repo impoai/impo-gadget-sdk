@@ -38,11 +38,11 @@ static void base64url(const uint8_t *in, size_t len, char *out) {
 }
 #endif
 
-void gadget_attest_add(cJSON *params, const uint8_t *handshake_hash, size_t len) {
+bool gadget_attest_add(cJSON *params, const uint8_t *handshake_hash, size_t len) {
 #if SOC_HMAC_SUPPORTED
-    if (!params || !handshake_hash || len != GADGET_ATTEST_HASH_SIZE) return;
+    if (!params || !handshake_hash || len != GADGET_ATTEST_HASH_SIZE) return false;
     if (esp_efuse_get_key_purpose(ATTEST_KEY_BLOCK) != ESP_EFUSE_KEY_PURPOSE_HMAC_UP) {
-        return;
+        return false;
     }
 
     // A unit with a key that can't produce a proof sends neither field and
@@ -50,7 +50,7 @@ void gadget_attest_add(cJSON *params, const uint8_t *handshake_hash, size_t len)
     uint8_t mac[6];
     if (esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY) != ESP_OK) {
         ESP_LOGE(TAG, "factory MAC unreadable; registering without attestation");
-        return;
+        return false;
     }
     uint8_t msg[sizeof(ATTEST_LABEL) + GADGET_ATTEST_HASH_SIZE];
     memcpy(msg, ATTEST_LABEL, sizeof(ATTEST_LABEL));
@@ -60,7 +60,7 @@ void gadget_attest_add(cJSON *params, const uint8_t *handshake_hash, size_t len)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "HMAC failed (%s); registering without attestation",
                  esp_err_to_name(err));
-        return;
+        return false;
     }
 
     char unit_id[13];
@@ -70,9 +70,11 @@ void gadget_attest_add(cJSON *params, const uint8_t *handshake_hash, size_t len)
     base64url(proof, sizeof(proof), attest);
     cJSON_AddStringToObject(params, "unit_id", unit_id);
     cJSON_AddStringToObject(params, "attest", attest);
+    return true;
 #else
     (void)params;
     (void)handshake_hash;
     (void)len;
+    return false;
 #endif
 }

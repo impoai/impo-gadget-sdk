@@ -1288,7 +1288,12 @@ static char *build_register_json(const uint8_t *handshake_hash,
     cJSON_AddBoolToObject(params, "is_wakeup_supported", false);
     cJSON *metadata = nullptr;
     add_register_metadata_string(&metadata, params, "network_ssid", wifi_ssid);
-    gadget_attest_add(params, handshake_hash, handshake_hash_len);
+    // Who this gadget is (contracts/gadget-identity.md in impoai/impo): an
+    // official unit proves it; any other may name its owner's product.
+    bool attested = gadget_attest_add(params, handshake_hash, handshake_hash_len);
+    if (!attested && strlen(CONFIG_GADGET_PRODUCT_ID) > 0) {
+        cJSON_AddStringToObject(params, "product_id", CONFIG_GADGET_PRODUCT_ID);
+    }
 #if CONFIG_IMPO_ENABLED
     impo_commands_capabilities(params);   // what this gadget has, see CAPABILITIES.md
 #endif

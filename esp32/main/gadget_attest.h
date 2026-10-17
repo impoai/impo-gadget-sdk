@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -22,9 +23,10 @@ extern "C" {
 //            HMAC(unit key, "impo-gadget/attest/v1" 0x00 h)
 //
 // h is the current session's handshake hash, which binds the proof to this
-// connection. Otherwise, and on chips without an HMAC peripheral (the classic
-// ESP32), it adds neither field and the gadget registers as custom.
-void gadget_attest_add(cJSON *params, const uint8_t *handshake_hash, size_t len);
+// connection, and returns true. Otherwise, and on chips without an HMAC
+// peripheral (the classic ESP32), it adds neither field and returns false: the
+// gadget registers as custom.
+bool gadget_attest_add(cJSON *params, const uint8_t *handshake_hash, size_t len);
 
 #ifdef __cplusplus
 }

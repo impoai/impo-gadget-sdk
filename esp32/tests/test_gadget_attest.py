@@ -50,6 +50,7 @@ class GadgetAttestTest(unittest.TestCase):
     def test_keyed_unit_attests_with_the_handshake_hash(self) -> None:
         cases = self.run_harness()
         keyed = cases["keyed"]
+        self.assertEqual(keyed["attested"], "1")
         self.assertEqual(keyed["unit_id"], "70af096dc5a8")
         self.assertEqual(keyed["key"], "5")
         self.assertEqual(bytes.fromhex(keyed["message"]),
@@ -63,6 +64,7 @@ class GadgetAttestTest(unittest.TestCase):
         # No session hash and a failed HMAC send nothing, never a partial pair;
         # a block without the HMAC_UP purpose is never handed to the peripheral.
         for name in ("no_session", "short_hash", "hmac_fails", "no_key"):
+            self.assertEqual(cases[name]["attested"], "0", name)
             self.assertEqual(cases[name]["unit_id"], "-", name)
             self.assertEqual(cases[name]["attest"], "-", name)
         self.assertEqual(cases["no_key"]["key"], "-1")
@@ -70,7 +72,7 @@ class GadgetAttestTest(unittest.TestCase):
 
     def test_classic_esp32_never_attests(self) -> None:
         cases = self.run_harness("-DFAKE_TARGET_ESP32")
-        self.assertEqual(cases["no_peripheral"], {"unit_id": "-", "attest": "-"})
+        self.assertEqual(cases["no_peripheral"], {"attested": "0", "unit_id": "-", "attest": "-"})
 
 
 if __name__ == "__main__":

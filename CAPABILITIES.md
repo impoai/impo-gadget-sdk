@@ -35,34 +35,22 @@ contract.
 
 ## How a gadget says what it has
 
-`link.register` carries four things, all written in the firmware. For a
-custom gadget, such as one a person built with this SDK, nothing about it is
-configured on a server: what the agent knows of the device is what the device
-said when it connected. An official gadget proves which unit it is (below), and
-the server's manifest for its product then supplies the descriptions.
+A gadget's firmware says only **who it is** and **what it can execute**.
+Everything the agent is told about it (what the device is for, what its
+events mean, how to use its commands) is the product's manifest on the Impo
+developer platform, not the firmware. The contract is
+`contracts/gadget-identity.md` in the impoai/impo repository.
 
-- `commands_v2`: every command the gadget runs, each with a description the
-  agent reads and `required` / `optional` parameters (`{"type", "description"}`
-  each). The agent calls a command with exactly these parameters; a result is
-  `{"ok": true, "payload": {...}}` or `{"ok": false, "error": "..."}`.
-- `events`: the events it sends (below), each with what it means on this
-  device: `[{"name": "picked_up", "description": "Someone lifted the robot
-  off the desk, most likely to talk to it."}]`. At most 16, descriptions up
-  to 200 characters.
-- `instructions`: the maker's words to the agent that owns the gadget, in
-  plain language, up to 1500 characters: what the device is for and what to
-  do when its events arrive ("When it is picked up, greet them and read their
-  next calendar event. Everything you say is spoken aloud: three sentences,
-  no markdown."). The agent carries them out with whatever the person has
-  connected (mail, calendar, other gadgets) and says so when something is
-  missing. They sit below the person's own wishes and the platform's rules:
-  a gadget can ask, never override, and it has no access of its own. The
-  gateway refuses a registration over these limits (`invalid_instructions`,
-  `invalid_events`), so a firmware that writes too much finds out at once.
-  A gadget's task answers one thing at a time: while the agent works on one
-  event, the next waits. So ask for what one lookup can answer ("the subjects
-  of the two newest unread mails"), not for what takes a tour ("how many
-  unread mails"): a long turn leaves the gadget mute until it ends.
+`link.register` carries:
+
+- `commands_v2`: every command the gadget runs, each with a description and
+  `required` / `optional` parameters (`{"type", "description"}` each). The
+  gateway checks a bound gadget's manifest against these names: a manifest
+  command the firmware does not register makes the gadget not set up. A
+  gadget that is not set up is offered these commands as they are. A result
+  is `{"ok": true, "payload": {...}}` or `{"ok": false, "error": "..."}`.
+- Who it is: an official unit's `unit_id` and `attest` (below), or a custom
+  gadget's `product_id` (below), or neither.
 - `capabilities`: a summary for apps and prompts, without listing commands:
 
 ```json
@@ -80,11 +68,8 @@ the server's manifest for its product then supplies the descriptions.
 (`chassis.*`), `lights` (lights the agent can set), `touch_pads`,
 `environment_sensors` (`sensors.read`).
 
-The Impo server shows `capabilities`, `events` and `instructions` with each
-gadget in `impo_list_gadgets`; the gateway keeps them with the registration
-and quotes the event's meaning and the instructions with every `link.event`
-it passes on. A board fills them in `impo_board_t.events` and
-`impo_board_t.instructions`.
+The Impo server shows `capabilities` with each gadget in
+`impo_list_gadgets`.
 
 ### Official gadgets: `unit_id` and `attest`
 
@@ -102,10 +87,30 @@ A unit of a product that Impo registered carries a per-unit key in eFuse
 Firmware sends both or neither: neither when the block has no such key, on
 the classic ESP32 (no HMAC peripheral), and when the peripheral fails, so
 that gadget registers as custom. When the gateway accepts the proof, the
-manifest's `instructions`, `events` and command descriptions replace the
-firmware's; the command names and parameters stay the firmware's. The
-contract is `contracts/gadget-identity.md` in the impoai/impo repository;
-`esp32/main/gadget_attest.c` implements it.
+agent gets the manifest of the unit's product. `esp32/main/gadget_attest.c`
+implements it.
+
+### Custom gadgets: `product_id`
+
+A gadget without a unit key can name a product its owner created on the Impo
+developer platform: set `CONFIG_GADGET_PRODUCT_ID` (`idf.py menuconfig` >
+ESP32 Device SDK) to the product's ID, 2 to 40 characters of `a-z`, `0-9` and
+`-`. The build fails on any other value. `link.register` then carries
+`"product_id": "desk-robot"`, only when the unit did not attest: an official
+unit sends `unit_id` and `attest` and never a `product_id`. Nothing is
+proven: the binding holds only when the product's owner is the account the
+gadget is paired to, and the agent then gets the product's `dev` manifest.
+Left empty (the default), nothing is sent and the gadget is not set up: its
+commands work, but the agent gets no instructions or event meanings for it.
+
+To describe a gadget to the agent, create a product on the developer
+platform and fill in its manifest: a system prompt, the commands the agent
+may use (each a description and a JSON Schema for its parameters) and the
+events with what each means on this device. A gadget's task answers one
+thing at a time: while the agent works on one event, the next waits. So a
+system prompt should ask for what one lookup can answer ("the subjects of the
+two newest unread mails"), not for what takes a tour ("how many unread
+mails"): a long turn leaves the gadget mute until it ends.
 
 ## The vocabulary
 
@@ -257,7 +262,7 @@ base answered the gadget, which proves the link, not the movement.
 The gadget can call the agent too: `link.event` on the control stream, with
 `{"event": "<name>", "data": {...}, "uptime_ms"}`. The gateway posts it to the
 gadget's own standing task ("[Gadget event] Desk Bot: shaken (peak_g=2.3,
-strength=hard)", plus what the board says it means), never to the person's
+strength=hard)", plus what its manifest says it means), never to the person's
 conversation, and the agent's reply is spoken by the gadget. Events are
 for things worth a remark, debounced on the gadget; the gateway ignores a
 repeat of the same event from the same gadget within three seconds.
@@ -268,11 +273,12 @@ repeat of the same event from the same gadget within three seconds.
 | `picked_up` | `motion_sensor` | `orientation` it ended up in |
 | `put_down` | `motion_sensor` | `orientation` (upright) |
 
-A board sends one with `impo_link_send_event(name, data)` and describes it
-in `impo_board_t.events`; a new event name gets a row here first.
+A board sends one with `impo_link_send_event(name, data)`; a new event name
+gets a row here first. What it means on a device goes in the product's
+manifest.
 
-What happens next is the agent's call, guided by the gadget's
-`instructions`. A reaction that needs no judgement (a sound, a fixed phrase,
+What happens next is the agent's call, guided by the manifest's system
+prompt. A reaction that needs no judgement (a sound, a fixed phrase,
 a light) belongs in the firmware itself: `speaker.say` through the platform's
 TTS, or a local file through `impo_sound`; it is instant and works without
 the agent. An event is for what needs the person's context.

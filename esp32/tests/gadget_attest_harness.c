@@ -47,10 +47,10 @@ esp_err_t esp_hmac_calculate(hmac_key_id_t key_id, const void *message,
 
 static void print_case(const char *name, const uint8_t *hash, size_t len) {
     cJSON *params = cJSON_CreateObject();
-    gadget_attest_add(params, hash, len);
+    bool attested = gadget_attest_add(params, hash, len);
     cJSON *unit_id = cJSON_GetObjectItem(params, "unit_id");
     cJSON *attest = cJSON_GetObjectItem(params, "attest");
-    printf("%s unit_id=%s attest=%s", name,
+    printf("%s attested=%d unit_id=%s attest=%s", name, attested,
            unit_id ? unit_id->valuestring : "-", attest ? attest->valuestring : "-");
 #if SOC_HMAC_SUPPORTED
     printf(" key=%d message=", s_hmac_key);

@@ -173,9 +173,12 @@ static const char *s_node_id = "test-node", *s_display_name = "Test device";
 static void copy_wifi_ssid(char *out, size_t size) { snprintf(out, size, "%s", s_wifi_ssid); }
 static void make_uuid(char *out, size_t size) { snprintf(out, size, "test-request"); }
 // gadget_attest.c has its own harness; here, check what the builder hands it.
-static void gadget_attest_add(cJSON *params, const uint8_t *hash, size_t len) {
-    if (hash && len == 32 && hash[0] == 0xa5) cJSON_AddStringToObject(params, "attest", "seen");
+static bool gadget_attest_add(cJSON *params, const uint8_t *hash, size_t len) {
+    if (!hash || len != 32 || hash[0] != 0xa5) return false;
+    cJSON_AddStringToObject(params, "attest", "seen");
+    return true;
 }
+#define CONFIG_GADGET_PRODUCT_ID "desk-robot"
 ''' + functions + '''
 int main(void) {
     for (int on = 0; on <= 1; on++) {
@@ -201,6 +204,10 @@ int main(void) {
                 self.assertEqual(params["version"], "999.0.0")
                 # The session's handshake hash reaches attestation unchanged.
                 self.assertEqual(params.get("attest"), "seen" if enabled else None)
+                # Only a unit that did not attest names a product.
+                self.assertEqual(params.get("product_id"), None if enabled else "desk-robot")
+                for field in ("instructions", "events"):
+                    self.assertNotIn(field, params)
 
 
 if __name__ == "__main__":

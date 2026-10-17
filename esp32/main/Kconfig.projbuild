@@ -32,6 +32,18 @@ menu "ESP32 Device SDK"
             app inside the encrypted pairing session and includes it when it
             refreshes its device token.
 
+    config GADGET_PRODUCT_ID
+        string "Impo product ID (custom gadgets)"
+        default ""
+        help
+            The ID of a product you created on the Impo developer platform,
+            2 to 40 characters of a-z, 0-9 and -. The gadget sends it in
+            link.register, and the agent then gets that product's manifest:
+            what the gadget is for, its commands and its events. It binds
+            only when the product is yours, the account the gadget is paired
+            to. Official units with a unit key attest instead and never send
+            it. Empty: not sent, and the gadget is not set up.
+
     config HOMEHUB_WIFI_SSID
         string "WiFi SSID override (dev iteration)"
         default ""

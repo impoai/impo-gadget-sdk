@@ -88,7 +88,7 @@ ever on a gadget.
 | BLE GATT (`ImpoGadget-…`) | app ↔ gadget | setup: Wi-Fi, the pairing record, `wifi.*` and `hatch.*` commands; the USB console speaks the same `key=value` lines after `>` |
 | Gateway HTTP | gadget → gateway | `GET /fetch_vms`, `POST /device_token/refresh`, `GET /v1/noise` (WebSocket) |
 | Noise session streams | gadget ↔ gateway | `POST /link-control` (control messages), `GET /identity`, `POST /chat/stream` (a message from the gadget), `POST /chat/subscribe` (replies, NDJSON events), `POST /tts` (speech), `/api/voice/dictation` (push-to-talk audio up) |
-| Control messages | gadget ↔ gateway | `link.register {node_id, display_name, platform, version, commands_v2, capabilities, events, instructions, unit_id?, attest?}` (the last two only from official units), `link.invoke {id, command, params}` → `link.result {id, ok, payload, error}`, `link.event {event, data, uptime_ms}`, `link.unpaired`, heartbeats |
+| Control messages | gadget ↔ gateway | `link.register {node_id, display_name, platform, version, commands_v2, capabilities, unit_id?, attest?, product_id?}` (`unit_id` and `attest` only from official units, `product_id` only from custom gadgets that name a product), `link.invoke {id, command, params}` → `link.result {id, ok, payload, error}`, `link.event {event, data, uptime_ms}`, `link.unpaired`, heartbeats |
 | Gateway admin HTTP | API → gateway | `GET /admin/vms/:vm` (pairings, devices, live sockets, chat, events, hub version), `POST .../pairings`, `DELETE .../pairings/:id`, `POST .../invoke`, `POST .../replies` |
 | Impo API | app, gateway → API | `/api/v1/gadgets[...]`, `/api/v1/conversation/*`, `/api/v1/voice/transcriptions`, `/api/v1/voice/speech`, `/api/v1/files/...` |
 | Agent tools | agent → API | `impo_list_gadgets`, `impo_gadget_command` |
@@ -176,8 +176,8 @@ sequenceDiagram
 
 Nothing from a gadget enters the person's conversation. Each gadget has
 one standing task on the Impo side (Decisions, 8): the gateway opens it on
-the gadget's first word with the maker's `instructions` and `events` as the
-opening message, keeps its id with the registration, and posts every event
+the gadget's first word with the instructions and events of its product's
+manifest (Decisions, 7) as the opening message, keeps its id with the registration, and posts every event
 and every spoken sentence to it. The task's agent has the person's
 connections and the gadget's commands as tools; what it answers is spoken
 by the gadget. The task appears in the app's task list under the gadget's
@@ -236,19 +236,26 @@ Settled, so that nothing below has to be argued twice.
 6. **Things that move need a person's say-so.** Nothing automated drives
    the base or anything else that moves unless the person asked for that
    behaviour explicitly (the `physical` grant in `docs/GADGET-AGENTS.md`).
-7. **A gadget speaks for itself; the agent decides.** A custom gadget
-   describes itself in the firmware: its commands, its events and its
-   maker's `instructions` arrive with `link.register`, and nothing is
-   configured per device on a server. An official gadget proves its unit
-   in the same message (`unit_id` and `attest`, a per-unit eFuse key over
-   the session's handshake hash); the server's manifest for its product
-   then supplies the `instructions`, the events and the command
-   descriptions, so they can change without a firmware update. The
-   firmware keeps the execution contract either way: the command names and
-   their parameters. The instructions can ask for anything ("when shaken, read the newest mail"),
-   because the gadget has no access of its own: the agent carries them out
-   with the person's connections, under the person's wishes and the
-   platform's rules. The security boundary is the agent, not the device.
+7. **A gadget says who it is and what it executes; the platform says the
+   rest; the agent decides.** The firmware's `link.register` carries its
+   identity and its execution contract, nothing more. Its identity is a
+   proof from an official unit (`unit_id` and `attest`, a per-unit eFuse key
+   over the session's handshake hash) or, from a custom gadget, a
+   `product_id` that binds only when the product's owner is the account the
+   gadget is paired to. Its execution contract is the commands it runs
+   (`commands_v2`: names and parameters). Everything said to the agent about
+   it lives on the Impo platform as the product's structured manifest: a
+   system prompt, the commands the agent may use with a description and a
+   parameter schema each, and the events with their meanings. Makers fill
+   it in on the developer platform, so it changes without a firmware
+   update, and the gateway checks it against the commands the firmware
+   registers. A gadget bound to no product connects and runs its commands,
+   but the agent gets no instructions or event meanings for it. The
+   contract is `contracts/gadget-identity.md` in impoai/impo. A manifest
+   can ask for anything ("when shaken, read the newest mail"), because the
+   gadget has no access of its own: the agent carries it out with the
+   person's connections, under the person's wishes and the platform's
+   rules. The security boundary is the agent, not the device.
 8. **Who starts it decides where it goes.** What the person says to the
    agent, in the app or by asking it to use a gadget, is their conversation.
    What a gadget starts, an event or words spoken into it, goes to that
@@ -256,7 +263,7 @@ Settled, so that nothing below has to be argued twice.
    its own, never mixed into the person's. One task per gadget, for its
    whole life, not one per event. A task runs one turn at a time, so a
    gadget's events are answered in order and a long turn delays the next;
-   makers write instructions that finish in one step (CAPABILITIES.md).
+   makers write manifests whose requests finish in one step (CAPABILITIES.md).
 
 ## Where the state is
 
@@ -275,11 +282,11 @@ Settled, so that nothing below has to be argued twice.
 | A board | one file filling `impo_board_t`, a `sdkconfig` overlay, a line in `board.sh`/`ports.py`/`Kconfig`/the tables (`esp32/components/impo/boards/README.md`) | protocol, gateway, API, app |
 | A command for one board | that board's `commands` table | — |
 | A command every board shares | `impo_commands.c` + a row in CAPABILITIES.md | the gateway (it passes any name through) |
-| An event | `impo_link_send_event` from the board, its meaning in `impo_board_t.events` + a row in CAPABILITIES.md | the gateway (it passes any name through) |
-| What a device is for, what to do on its events | `impo_board_t.instructions` in the board file (maker) | the agent's own instructions (platform) |
+| An event | `impo_link_send_event` from the board + a row in CAPABILITIES.md; its meaning on a device in the product's manifest on the Impo developer platform (maker) | the gateway (it passes any name through), the firmware's registration |
+| What a device is for, what to do on its events, how to use its commands | the product's manifest on the Impo developer platform (maker): system prompt, commands, events | the firmware, the agent's own instructions (platform) |
 | A capability needing new plumbing (a stream) | CAPABILITIES.md first, then firmware, gateway, API, app | board files |
 | A third-party device | a `skills/*/SKILL.md` | firmware |
-| How the agent treats gadgets | `gadgetInstructions` in `impo/server/src/tools/gadget-tools.ts` (platform), each command's description (maker), skills (device) | — |
+| How the agent treats gadgets | `gadgetInstructions` in `impo/server/src/tools/gadget-tools.ts` (platform), the product's manifest (maker), skills (device) | — |
 | The speech or vision provider | `impo/server/src/voice/` | firmware, gateway |
 | User-made behaviour on events | gadget agents (proposed) | firmware |
 

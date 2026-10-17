@@ -25,12 +25,11 @@ one file plus two helpers for its touch pads and motion sensor.
 4. Put what the board has beyond the fixed capabilities in `features`
    (`"motion_sensor,locomotion,lights"`), and its own commands in `commands`,
    named as [`../../../../CAPABILITIES.md`](../../../../CAPABILITIES.md) says.
-   If it sends events, list them in `events` with what each means on this
-   device, and write the agent's `instructions`: what the device is for and
-   what to do when its events arrive, in plain language (1500 characters).
-   This is the whole of what the agent will know about the device, so write
-   it for a reader who has never seen it. `board_espressif_sparkbot.c` is the
-   example.
+   Send its events with `impo_link_send_event()`, named as CAPABILITIES.md
+   says (`sparkbot_imu.c` is the example). The firmware says only what the
+   gadget can execute: what it is for, what its events mean and how the agent
+   should use its commands go in the product's manifest on the Impo developer
+   platform (`contracts/gadget-identity.md` in impoai/impo).
 5. Add the board to `Kconfig`, `CMakeLists.txt`, `devices/sdkconfig.impo-<board>`,
    `tools/impo/board.sh` and `ports.py`, and the tables in `devices/README.md`
    and `README.md`.
