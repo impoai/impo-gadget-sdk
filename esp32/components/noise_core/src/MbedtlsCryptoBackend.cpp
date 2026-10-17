@@ -36,10 +36,51 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+
+// Impo change (MIT): a toolchain whose C library has no thread support (the
+// ARCS port's newlib has no gthreads, so there is no std::mutex) defines
+// NOISE_CORE_FREERTOS_MUTEX and gets a FreeRTOS mutex with the same
+// lock/unlock shape. Without the macro this is std::mutex and
+// std::lock_guard, as before.
+#if defined(NOISE_CORE_FREERTOS_MUTEX)
+#include "FreeRTOS.h"
+#include "semphr.h"
+#else
 #include <mutex>
+#endif
 
 namespace impogadgets::noise::core {
 namespace {
+
+#if defined(NOISE_CORE_FREERTOS_MUTEX)
+class Mutex {
+ public:
+  Mutex() noexcept : handle_(xSemaphoreCreateMutex()) {}
+  Mutex(const Mutex&) = delete;
+  Mutex& operator=(const Mutex&) = delete;
+  void lock() noexcept { xSemaphoreTake(handle_, portMAX_DELAY); }
+  void unlock() noexcept { xSemaphoreGive(handle_); }
+
+ private:
+  SemaphoreHandle_t handle_;
+};
+
+template <typename M>
+class LockGuard {
+ public:
+  explicit LockGuard(M& m) noexcept : m_(m) { m_.lock(); }
+  ~LockGuard() noexcept { m_.unlock(); }
+  LockGuard(const LockGuard&) = delete;
+  LockGuard& operator=(const LockGuard&) = delete;
+
+ private:
+  M& m_;
+};
+#else
+using Mutex = std::mutex;
+template <typename M>
+using LockGuard = std::lock_guard<M>;
+#endif
 
 constexpr uint8_t kX25519LowByteClampMask = 0xf8;
 constexpr uint8_t kX25519HighByteClearMask = 0x7f;
@@ -100,7 +141,7 @@ class RandomState {
       return OkStatus();
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    LockGuard<Mutex> lock(mutex_);
     Status status = EnsureSeededLocked();
     if (!status.ok()) {
       return status;
@@ -133,7 +174,7 @@ class RandomState {
       return 0;
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    LockGuard<Mutex> lock(mutex_);
     if (!EnsureSeededLocked().ok()) {
       return MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED;
     }
@@ -171,7 +212,7 @@ class RandomState {
 
   mbedtls_entropy_context entropy_{};
   mbedtls_ctr_drbg_context ctrDrbg_{};
-  std::mutex mutex_;
+  Mutex mutex_;
   bool seeded_{false};
 };
 

@@ -15,6 +15,14 @@ Changes in this fork include Impo branding and endpoints, gateway TLS support,
 board and command extensions, and original Robin avatar artwork. README.md
 records the fork differences and the licenses of other third-party files.
 
+The ARCS firmware in arcs/ includes files from ListenAI's ARCS SDK and its
+ARCS-MINI V2.1 robot dog firmware (board definition, power manager, build and
+flash scripts, configuration), Copyright (c) LISTENAI / ANHUI LISTENAI Co.,
+Ltd., with their headers kept where they have one, and the robot dog's motion
+and sensor drivers written by Marshall for that firmware. They are published
+here with permission. arcs/README.md lists them. The ARCS SDK itself is not
+included.
+
 Both the MIT and Apache-2.0 portions permit commercial use and hosting under
 their respective terms. The Gadget SDK is not subject to the Impo platform's
 Elastic License hosted-service restriction.
