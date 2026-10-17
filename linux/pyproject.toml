@@ -21,7 +21,8 @@ name = "impogadget"
 version = "0.1.0"
 description = "Make any Linux computer into a Impo Home Link that pairs with the Impo app"
 readme = "README.md"
-license = "Apache-2.0"
+license = "Apache-2.0 AND MIT"
+license-files = ["LICENSE", "LICENSE-APACHE", "NOTICE"]
 requires-python = ">=3.9"
 # cryptography comes from the distro (python3-cryptography) on devices; the
 # floor is Debian 11 / Raspberry Pi OS Bullseye's 3.3.2.

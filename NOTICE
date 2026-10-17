@@ -1,0 +1,20 @@
+Impo Gadget SDK
+Copyright (c) 2026 Impo contributors
+
+Original Impo contributions, including original code, documentation, artwork
+and modifications, are offered under the MIT License in LICENSE.
+
+This project is a fork of facebookincubator/muse-gadget-sdk:
+https://github.com/facebookincubator/muse-gadget-sdk
+Copyright (c) Meta Platforms, Inc. and affiliates.
+Upstream material remains under Apache License 2.0 in LICENSE-APACHE.
+Existing upstream copyright and license headers remain in place. The MIT
+grant covers Impo contributions; it does not replace upstream terms.
+
+Changes in this fork include Impo branding and endpoints, gateway TLS support,
+board and command extensions, and original Robin avatar artwork. README.md
+records the fork differences and the licenses of other third-party files.
+
+Both the MIT and Apache-2.0 portions permit commercial use and hosting under
+their respective terms. The Gadget SDK is not subject to the Impo platform's
+Elastic License hosted-service restriction.

@@ -148,4 +148,6 @@ other, and share what you make.
 
 ## License
 
-Apache 2.0. See [`LICENSE`](../LICENSE).
+Original Impo contributions use [MIT](../LICENSE). Meta-derived code remains
+[Apache-2.0](../LICENSE-APACHE). See [NOTICE](../NOTICE) for scope; the SDK has no
+Elastic License hosting restriction.

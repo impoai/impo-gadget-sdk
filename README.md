@@ -28,7 +28,7 @@ limitations under the License.
 >   command (`impogadget`) and the ESP32 component (`components/impo`). The
 >   wire protocol is unchanged. "Impo Home Link" in the firmware and skills
 >   refers to the same reference design upstream calls Muse Home Link.
-> - The default avatar is Robin, an original Apache-licensed character.
+> - The default avatar is Robin, an original MIT-licensed character.
 > - The ESP32 firmware verifies cross-signed certificate chains, which the
 >   Impo gateway's TLS certificate needs.
 > - It adds a board: the Espressif ESP-SparkBot.
@@ -97,9 +97,13 @@ other, and share what you make.
 
 ## License
 
-Impo Gadgets is licensed under the Apache License, Version 2.0, found in
-[`LICENSE`](LICENSE), except for these third-party files, which keep their
-upstream licenses:
+Original Impo contributions are licensed under the [MIT License](LICENSE).
+The Meta-derived Muse Gadget SDK code remains under [Apache-2.0](LICENSE-APACHE).
+Keep both licenses and the [NOTICE](NOTICE) when distributing the combined SDK.
+The SDK remains fully open source and has no Elastic License hosting restriction.
+
+Existing upstream copyright and license headers remain in place. Other
+third-party files keep their upstream licenses:
 
 | Path | Upstream | License |
 |---|---|---|
@@ -112,4 +116,4 @@ Dependencies fetched at build time are under their own licenses: ESP-IDF
 components (into `esp32/managed_components/`), and the simulator's LVGL and
 SDL (listed in [`esp32/simulator/THIRD_PARTY.md`](esp32/simulator/THIRD_PARTY.md)).
 
-The default avatar, Robin, in [`esp32/avatar`](esp32/avatar) is original to this fork and is covered by the Apache License.
+The default avatar, Robin, in [`esp32/avatar`](esp32/avatar) is original to this fork and is covered by the MIT License.
