@@ -35,9 +35,11 @@ contract.
 
 ## How a gadget says what it has
 
-`link.register` carries four things, all written in the firmware. Nothing
-about a gadget is configured on a server: what the agent knows of a device is
-what the device said when it connected.
+`link.register` carries four things, all written in the firmware. For a
+custom gadget, such as one a person built with this SDK, nothing about it is
+configured on a server: what the agent knows of the device is what the device
+said when it connected. An official gadget proves which unit it is (below), and
+the server's manifest for its product then supplies the descriptions.
 
 - `commands_v2`: every command the gadget runs, each with a description the
   agent reads and `required` / `optional` parameters (`{"type", "description"}`
@@ -83,6 +85,27 @@ gadget in `impo_list_gadgets`; the gateway keeps them with the registration
 and quotes the event's meaning and the instructions with every `link.event`
 it passes on. A board fills them in `impo_board_t.events` and
 `impo_board_t.instructions`.
+
+### Official gadgets: `unit_id` and `attest`
+
+A unit of a product that Impo registered carries a per-unit key in eFuse
+`BLOCK_KEY5` (purpose `HMAC_UP`). Its `link.register` adds two fields:
+
+- `unit_id`: the chip's factory MAC, 12 lowercase hex digits
+  (`"70af096dc5a8"`).
+- `attest`: base64url without padding of the 32-byte HMAC-SHA256 that the
+  chip's HMAC peripheral computes with that key over
+  `"impo-gadget/attest/v1"`, one 0x00 byte, and the session's 32-byte Noise
+  handshake hash. The hash differs on every connection, so a recorded proof
+  is useless elsewhere.
+
+Firmware sends both or neither: neither when the block has no such key, on
+the classic ESP32 (no HMAC peripheral), and when the peripheral fails, so
+that gadget registers as custom. When the gateway accepts the proof, the
+manifest's `instructions`, `events` and command descriptions replace the
+firmware's; the command names and parameters stay the firmware's. The
+contract is `contracts/gadget-identity.md` in the impoai/impo repository;
+`esp32/main/gadget_attest.c` implements it.
 
 ## The vocabulary
 

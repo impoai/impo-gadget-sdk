@@ -85,6 +85,10 @@ bool ClientSession::isEstablished() const noexcept {
   return stage_ == Stage::Established && transport_.has_value();
 }
 
+ConstByteSpan ClientSession::handshakeHash() const noexcept {
+  return isEstablished() ? handshakeHash_.span() : ConstByteSpan();
+}
+
 bool ClientSession::HasOutboundWebSocketPayload() const noexcept {
   return framer_.HasOutboundMessage();
 }
@@ -139,12 +143,19 @@ StatusWithSize ClientSession::WriteHandshakeMessage3(
     return StatusWithSize(result.status(), result.size());
   }
 
+  // Finalize() destroys the handshake state, h included, so keep h first.
+  const ConstByteSpan hash = handshake_.handshakeHash();
+  for (size_t i = 0; i < handshakeHash_.size(); ++i) {
+    handshakeHash_[i] = hash[i];
+  }
+
   SecretArray<Transport::kKeySize> sendKey;
   SecretArray<Transport::kKeySize> recvKey;
   Status status = handshake_.Finalize(sendKey.span(), recvKey.span());
   if (!status.ok()) {
     Zeroize(sendKey.span());
     Zeroize(recvKey.span());
+    Zeroize(handshakeHash_.span());
     stage_ = Stage::Failed;
     return StatusWithSize(status, 0);
   }
@@ -156,6 +167,7 @@ StatusWithSize ClientSession::WriteHandshakeMessage3(
   status = transport_->status();
   if (!status.ok()) {
     transport_.reset();
+    Zeroize(handshakeHash_.span());
     stage_ = Stage::Failed;
     return StatusWithSize(status, 0);
   }

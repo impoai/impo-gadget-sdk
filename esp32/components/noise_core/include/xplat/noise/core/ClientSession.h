@@ -22,6 +22,7 @@
 
 #include <xplat/noise/core/CryptoBackend.h>
 #include <xplat/noise/core/InitiatorHandshake.h>
+#include <xplat/noise/core/Secret.h>
 #include <xplat/noise/core/ServiceCodec.h>
 #include <xplat/noise/core/Span.h>
 #include <xplat/noise/core/Status.h>
@@ -72,6 +73,11 @@ class ClientSession {
   ClientSession& operator=(ClientSession&&) = delete;
 
   [[nodiscard]] bool isEstablished() const noexcept;
+
+  // The Noise handshake hash h after message 3, the value both sides hold when
+  // the handshake completes. Empty until the session is established; zeroized
+  // with the session.
+  [[nodiscard]] ConstByteSpan handshakeHash() const noexcept;
 
   [[nodiscard]] bool HasOutboundWebSocketPayload() const noexcept;
 
@@ -158,6 +164,7 @@ class ClientSession {
   InitiatorHandshake handshake_;
   OrderedTransportFramer framer_;
   std::optional<Transport> transport_;
+  SecretArray<InitiatorHandshake::kKeySize> handshakeHash_;
   Stage stage_{Stage::Init};
 };
 

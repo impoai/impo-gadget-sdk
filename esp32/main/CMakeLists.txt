@@ -37,6 +37,7 @@ set(GADGET_SRCS
     "pairing_signer_policy.c"
     "pairing_transcript.c"
     "factory_test.c"
+    "gadget_attest.c"
 )
 
 set(GADGET_REQUIRES
@@ -62,6 +63,7 @@ set(GADGET_REQUIRES
     lwip
     mbedtls
     efuse
+    esp_security
     impo
     gadget_power
     # The voice board's. Requirements are resolved before the configuration

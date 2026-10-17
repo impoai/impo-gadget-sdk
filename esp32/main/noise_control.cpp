@@ -42,6 +42,7 @@ extern "C" {
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
 #include "display_canvas.h"
 #endif
+#include "gadget_attest.h"
 #include "led_status.h"
 #include "ota.h"
 #if CONFIG_IMPO_ENABLED
@@ -1261,7 +1262,8 @@ static void add_register_metadata_string(cJSON **metadata, cJSON *params,
     cJSON_AddStringToObject(*metadata, key, value);
 }
 
-static char *build_register_json(void) {
+static char *build_register_json(const uint8_t *handshake_hash,
+                                 size_t handshake_hash_len) {
     char wifi_ssid[sizeof(s_wifi_ssid)];
     copy_wifi_ssid(wifi_ssid, sizeof(wifi_ssid));
 
@@ -1286,6 +1288,7 @@ static char *build_register_json(void) {
     cJSON_AddBoolToObject(params, "is_wakeup_supported", false);
     cJSON *metadata = nullptr;
     add_register_metadata_string(&metadata, params, "network_ssid", wifi_ssid);
+    gadget_attest_add(params, handshake_hash, handshake_hash_len);
 #if CONFIG_IMPO_ENABLED
     impo_commands_capabilities(params);   // what this gadget has, see CAPABILITIES.md
 #endif
@@ -2077,7 +2080,8 @@ static session_result_t run_session(stack_monitor_t *stack) {
     {
         s_register_acked = false;
         s_heartbeat_registered = false;
-        char *reg_json = build_register_json();
+        char *reg_json = build_register_json(session.handshakeHash().data(),
+                                             session.handshakeHash().size());
         if (!reg_json) {
             ESP_LOGE(TAG, "could not build link.register: int=%u/%u dma=%u/%u",
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),

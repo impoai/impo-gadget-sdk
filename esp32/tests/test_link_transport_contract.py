@@ -142,7 +142,8 @@ class LinkTransportContractTest(unittest.TestCase):
         for command in ("device.unpair", "device.list_vms", "device.set_vm",
                         "device.reset_vm", "device.set_wifi", "device.set_auth"):
             self.assertNotIn(f'"{command}"', register)
-        self.assertIn("build_register_json()", session)
+        self.assertIn("build_register_json(session.handshakeHash().data(),", session)
+        self.assertIn("gadget_attest_add(params, handshake_hash, handshake_hash_len);", register)
         self.assertIn("control_tx = {reg_json, strlen(reg_json), 0, false, session_generation};", session)
         auth_failure = _function_body(task, "if (result == SESSION_AUTH_FAILED)")
         self.assertIn('notify_status("ws_auth_failed")', auth_failure)

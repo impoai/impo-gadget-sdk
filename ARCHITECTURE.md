@@ -88,7 +88,7 @@ ever on a gadget.
 | BLE GATT (`ImpoGadget-…`) | app ↔ gadget | setup: Wi-Fi, the pairing record, `wifi.*` and `hatch.*` commands; the USB console speaks the same `key=value` lines after `>` |
 | Gateway HTTP | gadget → gateway | `GET /fetch_vms`, `POST /device_token/refresh`, `GET /v1/noise` (WebSocket) |
 | Noise session streams | gadget ↔ gateway | `POST /link-control` (control messages), `GET /identity`, `POST /chat/stream` (a message from the gadget), `POST /chat/subscribe` (replies, NDJSON events), `POST /tts` (speech), `/api/voice/dictation` (push-to-talk audio up) |
-| Control messages | gadget ↔ gateway | `link.register {node_id, display_name, platform, version, commands_v2, capabilities}`, `link.invoke {id, command, params}` → `link.result {id, ok, payload, error}`, `link.event {event, data, uptime_ms}`, `link.unpaired`, heartbeats |
+| Control messages | gadget ↔ gateway | `link.register {node_id, display_name, platform, version, commands_v2, capabilities, events, instructions, unit_id?, attest?}` (the last two only from official units), `link.invoke {id, command, params}` → `link.result {id, ok, payload, error}`, `link.event {event, data, uptime_ms}`, `link.unpaired`, heartbeats |
 | Gateway admin HTTP | API → gateway | `GET /admin/vms/:vm` (pairings, devices, live sockets, chat, events, hub version), `POST .../pairings`, `DELETE .../pairings/:id`, `POST .../invoke`, `POST .../replies` |
 | Impo API | app, gateway → API | `/api/v1/gadgets[...]`, `/api/v1/conversation/*`, `/api/v1/voice/transcriptions`, `/api/v1/voice/speech`, `/api/v1/files/...` |
 | Agent tools | agent → API | `impo_list_gadgets`, `impo_gadget_command` |
@@ -236,11 +236,16 @@ Settled, so that nothing below has to be argued twice.
 6. **Things that move need a person's say-so.** Nothing automated drives
    the base or anything else that moves unless the person asked for that
    behaviour explicitly (the `physical` grant in `docs/GADGET-AGENTS.md`).
-7. **A gadget speaks for itself; the agent decides.** Everything the agent
-   knows about a device, its commands, its events and its maker's
-   `instructions`, is written in the firmware and arrives with
-   `link.register`; nothing is configured per device on a server. The
-   instructions can ask for anything ("when shaken, read the newest mail"),
+7. **A gadget speaks for itself; the agent decides.** A custom gadget
+   describes itself in the firmware: its commands, its events and its
+   maker's `instructions` arrive with `link.register`, and nothing is
+   configured per device on a server. An official gadget proves its unit
+   in the same message (`unit_id` and `attest`, a per-unit eFuse key over
+   the session's handshake hash); the server's manifest for its product
+   then supplies the `instructions`, the events and the command
+   descriptions, so they can change without a firmware update. The
+   firmware keeps the execution contract either way: the command names and
+   their parameters. The instructions can ask for anything ("when shaken, read the newest mail"),
    because the gadget has no access of its own: the agent carries them out
    with the person's connections, under the person's wishes and the
    platform's rules. The security boundary is the agent, not the device.
