@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WIFI_MGR_C = ROOT / "main" / "wifi_mgr.c"
 APP_C = ROOT / "main" / "app.c"
+SDKCONFIG_DEFAULTS = ROOT / "sdkconfig.defaults"
 
 
 def _function_body(source: str, signature: str) -> str:
@@ -184,6 +185,83 @@ class LinkWifiScanContractTest(unittest.TestCase):
         self.assertIn("completed_flags & SCAN_REFRESH_REPLY_PENDING", task)
         self.assertIn("wifi_mgr_scan_and_merge_cache()", task)
         self.assertIn("~SCAN_REFRESH_REPLY_PENDING", disconnected)
+
+    def test_reconnect_after_a_drop_goes_by_ssid(self) -> None:
+        """A mesh AP that went away, or is a room too far, must not keep the
+        gadget: post-association reconnects let the driver pick the strongest
+        AP of the SSID, while the first join may still target a cached BSSID."""
+        source = WIFI_MGR_C.read_text()
+        reconnect = _function_body(source, "static void reconnect_timer_cb(")
+        connect = _function_body(source, "bool wifi_mgr_connect(")
+
+        self.assertIn("wc.sta.bssid_set = false", reconnect)
+        self.assertIn("wc.sta.channel = 0", reconnect)
+        self.assertIn("WIFI_ALL_CHANNEL_SCAN", reconnect)
+        self.assertIn("WIFI_CONNECT_AP_BY_SIGNAL", reconnect)
+        self.assertIn("wc.sta.threshold.rssi = 0", reconnect)
+        self.assertLess(
+            reconnect.index("esp_wifi_set_config"),
+            reconnect.index("esp_wifi_connect()"),
+        )
+        # A join the driver started itself (802.11v) is left alone.
+        self.assertLess(
+            reconnect.index("esp_wifi_sta_get_ap_info"),
+            reconnect.index("esp_wifi_set_config"),
+        )
+        # The fast cached-BSSID path stays for the first join.
+        self.assertIn("wc.sta.bssid_set = true", connect)
+        self.assertIn("WIFI_FAST_SCAN", connect)
+
+    def test_low_signal_roams_to_a_clearly_stronger_ap(self) -> None:
+        source = WIFI_MGR_C.read_text()
+        handler = _function_body(source, "static void event_handler(")
+        on_low = _function_body(source, "static void on_rssi_low(")
+        roam = _function_body(source, "static void roam_try(")
+
+        self.assertIn("#define ROAM_RSSI_THRESHOLD   (-70)", source)
+        self.assertIn("#define ROAM_MIN_GAIN_DB      8", source)
+        self.assertIn("esp_wifi_set_rssi_threshold(ROAM_RSSI_THRESHOLD)", source)
+        self.assertIn("WIFI_EVENT_STA_BSS_RSSI_LOW", handler)
+        self.assertIn("on_rssi_low(", handler)
+
+        # The event loop never scans: a task of its own does.
+        self.assertNotIn("esp_wifi_scan_start", handler)
+        self.assertNotIn("esp_wifi_scan_start", on_low)
+        self.assertIn("xTaskCreate(roam_task", on_low)
+
+        # Rate-limited, and re-armed only after the limit has passed.
+        self.assertIn("ROAM_MIN_INTERVAL_US", on_low)
+        self.assertIn("roam_rearm_later()", on_low)
+
+        # Shares the radio like the other scans, and yields to a connect.
+        self.assertIn("xSemaphoreTake(s_scan_mutex, 0)", roam)
+        self.assertIn("xSemaphoreGive(s_scan_mutex)", roam)
+        self.assertGreaterEqual(roam.count("s_connect_pending"), 2)
+        self.assertIn("best->rssi - cur_rssi < ROAM_MIN_GAIN_DB", roam)
+        self.assertIn("memcmp(recs[i].bssid, cur.bssid, 6)", roam)
+        self.assertIn('"roaming " MACSTR " (%d dBm) -> " MACSTR', roam)
+        self.assertIn('"roamed " MACSTR " (%d dBm) -> " MACSTR', handler)
+
+    def test_leaving_for_a_roam_is_not_a_drop(self) -> None:
+        handler = _function_body(WIFI_MGR_C.read_text(), "static void event_handler(")
+        disconnected = handler[
+            handler.index("WIFI_EVENT_STA_DISCONNECTED") :
+            handler.index("IP_EVENT_STA_GOT_IP")
+        ]
+
+        self.assertLess(
+            disconnected.index("== ROAM_LEAVING) return"),
+            disconnected.index("schedule_reconnect()"),
+        )
+        # A failed roam join falls through to the reconnect by SSID.
+        self.assertIn("&joining, ROAM_IDLE", disconnected)
+
+    def test_80211kv_steering_is_on(self) -> None:
+        connect = _function_body(WIFI_MGR_C.read_text(), "bool wifi_mgr_connect(")
+
+        self.assertIn("wc.sta.rm_enabled = true", connect)
+        self.assertIn("wc.sta.btm_enabled = true", connect)
+        self.assertIn("CONFIG_ESP_WIFI_11KV_SUPPORT=y", SDKCONFIG_DEFAULTS.read_text())
 
     def test_disconnect_logs_reason_and_signal_only(self) -> None:
         body = _function_body(WIFI_MGR_C.read_text(), "static void event_handler(")

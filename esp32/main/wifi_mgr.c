@@ -24,6 +24,8 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_log.h"
+#include "esp_mac.h"
+#include "esp_timer.h"
 #include "soc/soc_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -89,13 +91,34 @@ static bool channel_hint_valid(uint8_t channel) {
            || (channel >= 149 && channel <= 177 && (channel - 149) % 4 == 0);
 }
 
+static TimerHandle_t s_reconnect_timer = NULL;
+static void schedule_reconnect(void);
+
+// After a drop, join the network, not the AP we had: on a mesh that AP may be
+// the one that went away, or a room too far. So clear the BSSID and channel
+// that a cached-BSSID join or a roam left in the config, and let the driver
+// pick the strongest AP of the SSID on every channel.
 static void reconnect_timer_cb(TimerHandle_t t) {
-    ESP_LOGI(TAG, "reconnect attempt (post-association)");
+    // The driver may have rejoined by itself (an 802.11v transition).
+    wifi_ap_record_t ap;
+    if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) return;
+    wifi_config_t wc;
+    if (esp_wifi_get_config(WIFI_IF_STA, &wc) == ESP_OK) {
+        wc.sta.bssid_set = false;
+        wc.sta.channel = 0;
+        wc.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+        wc.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+        wc.sta.threshold.rssi = 0;
+        // A join is still under way; its outcome brings the next attempt.
+        if (esp_wifi_set_config(WIFI_IF_STA, &wc) == ESP_ERR_WIFI_STATE) {
+            schedule_reconnect();
+            return;
+        }
+    }
+    ESP_LOGI(TAG, "reconnect attempt (post-association, by SSID)");
     atomic_store(&s_sta_idle, false);
     esp_wifi_connect();
 }
-
-static TimerHandle_t s_reconnect_timer = NULL;
 
 static void schedule_reconnect(void) {
     if (!s_reconnect_timer) {
@@ -148,6 +171,178 @@ static bool drop_rssi_floor(uint8_t reason) {
 }
 #endif
 
+// Roaming. A mesh is one SSID on several APs, and the driver stays on the one
+// it joined until the link is lost outright, so a gadget carried to another
+// room limps along on the far AP. When the signal falls below
+// ROAM_RSSI_THRESHOLD, scan for the same SSID and move to an AP that is
+// clearly stronger. Every move drops the link for a moment (and with it the
+// TCP sessions, since the netif loses its address), so only a big gain is
+// worth it, and at most once per ROAM_MIN_INTERVAL_US.
+#define ROAM_RSSI_THRESHOLD   (-70)
+#define ROAM_MIN_GAIN_DB      8
+#define ROAM_MIN_INTERVAL_US  (60LL * 1000 * 1000)
+#define ROAM_MAX_RECORDS      16     // BSSIDs of one SSID
+#define ROAM_TASK_STACK       4096
+
+typedef enum {
+    ROAM_IDLE,
+    ROAM_SCANNING,   // roam_task scanning for the SSID
+    ROAM_LEAVING,    // roam_task left the current AP; not a drop
+    ROAM_JOINING,    // joining the stronger AP; its outcome ends the roam
+} roam_stage_t;
+
+static atomic_int s_roam_stage = ATOMIC_VAR_INIT(ROAM_IDLE);
+static int64_t s_roam_last_us;           // event loop only
+static TimerHandle_t s_roam_rearm_timer;
+// The move under way, for the log once it lands.
+static uint8_t s_roam_from[6], s_roam_to[6];
+static int8_t s_roam_from_rssi;
+
+static void roam_arm(void) {
+    esp_wifi_set_rssi_threshold(ROAM_RSSI_THRESHOLD);
+}
+
+// The low-RSSI event fires once per arming: arm again once the rate limit
+// has passed, so a weak spot gets one look a minute, not a loop.
+static void roam_rearm_timer_cb(TimerHandle_t t) {
+    (void)t;
+    if (wifi_mgr_is_connected()) roam_arm();
+}
+
+static void roam_rearm_later(void) {
+    if (!s_roam_rearm_timer) {
+        s_roam_rearm_timer = xTimerCreate("wifi_roam",
+                                          pdMS_TO_TICKS(ROAM_MIN_INTERVAL_US / 1000),
+                                          pdFALSE, NULL, roam_rearm_timer_cb);
+    }
+    if (s_roam_rearm_timer) xTimerReset(s_roam_rearm_timer, 0);
+}
+
+// Scans for the joined SSID and, if another AP of it is ROAM_MIN_GAIN_DB
+// stronger, leaves for it. Holds s_scan_mutex throughout, so the other scans
+// stay out, and gives way to wifi_mgr_connect() like they do.
+static void roam_try(void) {
+    if (xSemaphoreTake(s_scan_mutex, 0) != pdTRUE) return;
+    wifi_ap_record_t *recs = NULL;
+    wifi_ap_record_t cur;
+    wifi_config_t wc;
+    char ssid[33] = {0};
+    if (atomic_load_explicit(&s_connect_pending, memory_order_acquire)
+        || esp_wifi_sta_get_ap_info(&cur) != ESP_OK
+        || esp_wifi_get_config(WIFI_IF_STA, &wc) != ESP_OK) {
+        goto done;
+    }
+    // From the config, not the AP record, so a hidden network works too.
+    memcpy(ssid, wc.sta.ssid, sizeof(wc.sta.ssid));
+
+    wifi_scan_config_t sc = {
+        .ssid = (uint8_t *)ssid,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+    };
+    ESP_LOGI(TAG, "signal %d dBm on " MACSTR "; looking for a nearer AP",
+             cur.rssi, MAC2STR(cur.bssid));
+    esp_err_t err = esp_wifi_scan_start(&sc, true);
+    if (atomic_load_explicit(&s_connect_pending, memory_order_acquire)) {
+        esp_wifi_clear_ap_list();
+        goto done;
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "roam scan failed: %s", esp_err_to_name(err));
+        goto done;
+    }
+    uint16_t n = ROAM_MAX_RECORDS;
+    recs = calloc(n, sizeof(*recs));
+    if (!recs) {
+        esp_wifi_clear_ap_list();
+        goto done;
+    }
+    esp_wifi_scan_get_ap_records(&n, recs);
+
+    // recs is RSSI-sorted: the first other BSSID of the SSID is the best.
+    // Compare it with the current AP as this scan heard it, when it did.
+    int8_t cur_rssi = cur.rssi;
+    const wifi_ap_record_t *best = NULL;
+    for (int i = 0; i < n; i++) {
+        if (strcmp((const char *)recs[i].ssid, ssid) != 0) continue;
+        if (memcmp(recs[i].bssid, cur.bssid, 6) == 0) {
+            cur_rssi = recs[i].rssi;
+        } else if (!best) {
+            best = &recs[i];
+        }
+    }
+    if (!best || best->rssi - cur_rssi < ROAM_MIN_GAIN_DB) {
+        ESP_LOGI(TAG, "no AP %d dB stronger than %d dBm; staying",
+                 ROAM_MIN_GAIN_DB, cur_rssi);
+        goto done;
+    }
+    // The link may have dropped during the scan; the reconnect has it then.
+    if (!s_keep_connected || !wifi_mgr_is_connected()
+        || atomic_load_explicit(&s_connect_pending, memory_order_acquire)) {
+        goto done;
+    }
+
+    ESP_LOGI(TAG, "roaming " MACSTR " (%d dBm) -> " MACSTR " ch%u (%d dBm)",
+             MAC2STR(cur.bssid), cur_rssi, MAC2STR(best->bssid),
+             best->primary, best->rssi);
+    memcpy(s_roam_from, cur.bssid, 6);
+    memcpy(s_roam_to, best->bssid, 6);
+    s_roam_from_rssi = cur_rssi;
+
+    atomic_store(&s_roam_stage, ROAM_LEAVING);
+    esp_wifi_disconnect();
+    for (int i = 0; i < 50 && !atomic_load(&s_sta_idle); i++) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    memcpy(wc.sta.bssid, best->bssid, 6);
+    wc.sta.bssid_set = true;
+    wc.sta.channel = best->primary;
+    wc.sta.scan_method = WIFI_FAST_SCAN;
+    wc.sta.threshold.rssi = 0;
+    for (int i = 0; i < 30; i++) {  // as in wifi_mgr_connect()
+        err = esp_wifi_set_config(WIFI_IF_STA, &wc);
+        if (err != ESP_ERR_WIFI_STATE) break;
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+    atomic_store(&s_roam_stage, ROAM_JOINING);
+    atomic_store(&s_sta_idle, false);
+    if (err != ESP_OK || !s_keep_connected || esp_wifi_connect() != ESP_OK) {
+        ESP_LOGW(TAG, "roam join didn't start; reconnecting by SSID");
+        atomic_store(&s_roam_stage, ROAM_IDLE);
+        atomic_store(&s_sta_idle, true);
+        if (s_keep_connected) schedule_reconnect();
+    }
+
+done:
+    free(recs);
+    int scanning = ROAM_SCANNING;
+    atomic_compare_exchange_strong(&s_roam_stage, &scanning, ROAM_IDLE);
+    xSemaphoreGive(s_scan_mutex);
+}
+
+static void roam_task(void *arg) {
+    (void)arg;
+    roam_try();
+    vTaskDelete(NULL);
+}
+
+// On the event loop: hand the scan to a task of its own.
+static void on_rssi_low(int32_t rssi) {
+    roam_rearm_later();
+    int64_t now = esp_timer_get_time();
+    int idle = ROAM_IDLE;
+    if (!s_keep_connected || s_connecting
+        || (s_roam_last_us && now - s_roam_last_us < ROAM_MIN_INTERVAL_US)
+        || !atomic_compare_exchange_strong(&s_roam_stage, &idle, ROAM_SCANNING)) {
+        return;
+    }
+    s_roam_last_us = now;
+    ESP_LOGI(TAG, "signal low (%d dBm)", (int)rssi);
+    if (xTaskCreate(roam_task, "wifi_roam", ROAM_TASK_STACK, NULL, 4, NULL) != pdPASS) {
+        ESP_LOGW(TAG, "no memory for a roam scan");
+        atomic_store(&s_roam_stage, ROAM_IDLE);
+    }
+}
+
 static void event_handler(void *arg, esp_event_base_t base,
                           int32_t id, void *data) {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
@@ -163,6 +358,14 @@ static void event_handler(void *arg, esp_event_base_t base,
         const wifi_event_sta_disconnected_t *event =
             (const wifi_event_sta_disconnected_t *)data;
         ESP_LOGW(TAG, "disconnected reason=%u", event ? event->reason : 0u);
+
+        // Our own step off the old AP on a roam; roam_try() joins the new one.
+        if (atomic_load(&s_roam_stage) == ROAM_LEAVING) return;
+        int joining = ROAM_JOINING;
+        if (atomic_compare_exchange_strong(&s_roam_stage, &joining, ROAM_IDLE)) {
+            ESP_LOGW(TAG, "roam to " MACSTR " failed; reconnecting by SSID",
+                     MAC2STR(s_roam_to));
+        }
 
         bool floor_dropped = event && drop_rssi_floor(event->reason);
         if (s_connecting) {
@@ -184,6 +387,17 @@ static void event_handler(void *arg, esp_event_base_t base,
             ESP_LOGW(TAG, "wifi disconnected post-association, scheduling reconnect");
             schedule_reconnect();
         }
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_CONNECTED) {
+        const wifi_event_sta_connected_t *ev =
+            (const wifi_event_sta_connected_t *)data;
+        if (ev) {
+            ESP_LOGI(TAG, "associated with " MACSTR " ch%u",
+                     MAC2STR(ev->bssid), ev->channel);
+        }
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_BSS_RSSI_LOW) {
+        const wifi_event_bss_rssi_low_t *ev =
+            (const wifi_event_bss_rssi_low_t *)data;
+        on_rssi_low(ev ? ev->rssi : 0);
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *ev = (ip_event_got_ip_t *)data;
         ESP_LOGI(TAG, "got IP " IPSTR, IP2STR(&ev->ip_info.ip));
@@ -191,6 +405,18 @@ static void event_handler(void *arg, esp_event_base_t base,
         s_keep_connected = true;
         s_reconnect_backoff_ms = RECONNECT_BACKOFF_MIN_MS;  // reset on success
         xEventGroupSetBits(s_events, BIT_CONNECTED | BIT_GOT_IP);
+        int joining = ROAM_JOINING;
+        if (atomic_compare_exchange_strong(&s_roam_stage, &joining, ROAM_IDLE)) {
+            wifi_ap_record_t ap;
+            int8_t rssi = esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? ap.rssi : 0;
+            ESP_LOGI(TAG, "roamed " MACSTR " (%d dBm) -> " MACSTR " (%d dBm)",
+                     MAC2STR(s_roam_from), s_roam_from_rssi,
+                     MAC2STR(s_roam_to), rssi);
+        }
+        // Within the rate limit the rearm timer arms it, once it has passed.
+        if (!s_roam_rearm_timer || !xTimerIsTimerActive(s_roam_rearm_timer)) {
+            roam_arm();
+        }
     }
 }
 
@@ -263,6 +489,8 @@ bool wifi_mgr_connect(const char *ssid, const char *password, int timeout_ms) {
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+    // A roam still joining is superseded by this connect.
+    atomic_store(&s_roam_stage, ROAM_IDLE);
 
     wifi_config_t wc = {0};
     // The driver reads these arrays without a terminator, so a 32-byte SSID
@@ -276,6 +504,12 @@ bool wifi_mgr_connect(const char *ssid, const char *password, int timeout_ms) {
     }
     wc.sta.threshold.authmode = WIFI_AUTH_OPEN;
     wc.sta.pmf_cfg.capable = true;
+    // 802.11k/v (CONFIG_ESP_WIFI_11KV_SUPPORT): a mesh that steers its
+    // clients can move this one to a nearer AP. With BTM on, the supplicant
+    // clears a BSSID and channel set below at the first join or drop, so
+    // they don't pin the gadget either.
+    wc.sta.rm_enabled = true;
+    wc.sta.btm_enabled = true;
 #if CONFIG_IMPO_ENABLED
     // Beacons between wakes in max modem sleep (Impo asleep on battery):
     // about 1 s at the usual 102.4 ms interval, a third of the wakes of the
@@ -287,7 +521,8 @@ bool wifi_mgr_connect(const char *ssid, const char *password, int timeout_ms) {
     // directly with WIFI_FAST_SCAN. This skips the ~10s all-channel re-scan
     // the driver does with WIFI_ALL_CHANNEL_SCAN + WIFI_CONNECT_AP_BY_SIGNAL.
     // Fall back to the full scan when no cache is available (e.g. reconnect
-    // after the AP changed channels).
+    // after the AP changed channels). Only this join is pinned: reconnects
+    // after a drop go by SSID (reconnect_timer_cb).
     bool have_bssid = false;
     for (int i = 0; i < s_bssid_cache_count; i++) {
         if (strcmp(s_bssid_cache[i].ssid, ssid) == 0) {
