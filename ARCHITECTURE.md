@@ -31,6 +31,7 @@ draws it; [`CAPABILITIES.md`](CAPABILITIES.md) is the command contract;
 |---|---|---|---|
 | Firmware | `esp32/` | the gadget (ESP32, ESP-IDF) | the board, the UI, voice, the Link client, commands, events |
 | Linux client | `linux/` | a Linux box, as a Python package | the same protocol without a board |
+| ARCS firmware | `arcs/` | the gadget (ListenAI ARCS, the ARCS SDK) | its boards, voice, commands, events; the Link client is `esp32/main`'s, built through an ESP-IDF compatibility layer |
 | Gateway | `impo/server/gadget-gateway` | Cloudflare Worker + one Durable Object per account | sessions, pairing, invoke/result, events, the TTS proxy, reply relay |
 | API + worker | `impo/server` | ECS (two services, one image) | accounts, chat, the agent's tools (`impo_list_gadgets`, `impo_gadget_command`), voice (STT, TTS), photo delivery |
 | Agent | Rebyte session per conversation | a sandbox | the conversation; reads gadget commands as tools, writes files the app shows |

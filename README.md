@@ -56,8 +56,9 @@ warranties, brownouts, or bankruptcies. Proceed at your own risk!
 |---|---|
 | [**ESP32 Device SDK**](esp32) | Connect your ESP32 board to Impo through our open source SDK. Throw in a screen to show images, add audio in and out, or wire up other sensors. |
 | [**Linux Device SDK**](linux) | Turn that spare Raspberry Pi or Linux box into a Impo gadget. Hack in your own commands to let Impo handle sysadmin chores or your Home Assistant setup. |
+| [**ARCS Device SDK**](arcs) | Firmware for ListenAI's ARCS (LS26xx RISC-V) chips. It runs the ESP32 firmware's link unchanged through an ESP-IDF compatibility layer. First board: the ARCS-MINI V2.1 robot dog, which walks, does tricks, talks and reacts to being picked up. |
 
-ESP32 and Linux gadgets pair with the Impo app on iOS and Android, via
+ESP32, Linux and ARCS gadgets pair with the Impo app on iOS and Android, via
 Settings > Devices. Turn on Developer mode there first, then look for devices
 prefixed with "ImpoGadget".
 Each directory has a `README.md` to get started and an `AGENTS.md` for coding
@@ -74,7 +75,7 @@ Three layers, each adapted by different people:
 
 | Layer | Where | Who adapts it |
 |---|---|---|
-| **Boards**: one file per piece of hardware, filling in the board interface (screen, audio, buttons, power, camera, extras) | [`esp32/components/impo/boards/`](esp32/components/impo/boards), [`linux/`](linux) | Whoever has the board, usually with a coding agent reading `AGENTS.md`. The [ESP-SparkBot](esp32/components/impo/boards/board_espressif_sparkbot.c) is the worked example. |
+| **Boards**: one file per piece of hardware, filling in the board interface (screen, audio, buttons, power, camera, extras) | [`esp32/components/impo/boards/`](esp32/components/impo/boards), [`linux/`](linux), [`arcs/boards/`](arcs/boards) | Whoever has the board, usually with a coding agent reading `AGENTS.md`. The [ESP-SparkBot](esp32/components/impo/boards/board_espressif_sparkbot.c) is the worked example. |
 | **Capabilities**: a fixed vocabulary of commands (`display.*`, `speaker.*`, `camera.*`, `imu.*`, `chassis.*`, `sensors.*`, `device.*`) with their parameters and results, plus a summary of what the gadget has | [`CAPABILITIES.md`](CAPABILITIES.md) | This project. A board registers the capabilities it implements; the agent and the app rely on the contract. |
 | **Ecosystem**: other people's devices on the home network, reached through a gadget's tunnel | [`skills/`](skills), one guide per product | The agent, following the skill; nothing in the firmware knows the product. |
 
@@ -111,6 +112,7 @@ third-party files keep their upstream licenses:
 | [`esp32/components/bmi270/src/bmi270.c`](esp32/components/bmi270) and its headers | [espressif/esp-bsp](https://github.com/espressif/esp-bsp/tree/master/components/sensors/bmi270) | Apache-2.0, see [`LICENSE`](esp32/components/bmi270/LICENSE) |
 | [`esp32/components/bmi270/src/bmi260_config.h`](esp32/components/bmi270/src/bmi260_config.h) | Bosch Sensortec, via [ChromiumOS EC](https://chromium.googlesource.com/chromiumos/platform/ec/+/HEAD/third_party/bmi260/) | BSD-3-Clause, see [`LICENSE.bmi260`](esp32/components/bmi270/LICENSE.bmi260) |
 | [`esp32/main/pixel_font.c`](esp32/main/pixel_font.c) | Adafruit GFX `glcdfont.c` | BSD-2-Clause, in the file header |
+| ListenAI files in [`arcs/`](arcs) (board definition, power manager, build and flash scripts) and the robot dog's motion drivers | ListenAI ARCS SDK and ARCS-MINI V2.1 firmware | their file headers where present; see [`arcs/README.md`](arcs/README.md#licensing) and [NOTICE](NOTICE) |
 
 Dependencies fetched at build time are under their own licenses: ESP-IDF
 components (into `esp32/managed_components/`), and the simulator's LVGL and

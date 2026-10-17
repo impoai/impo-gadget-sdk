@@ -1,0 +1,71 @@
+osource "$ARCS_BASE/Kconfig"
+
+menu "Impo Gadget"
+
+config GADGET_WIFI_SSID
+	string "Development Wi-Fi SSID"
+	default ""
+	help
+	  Build-time Wi-Fi network for bring-up. Put the real value in the
+	  untracked app/local.conf, never in prj.conf.
+
+config GADGET_WIFI_PASSWORD
+	string "Development Wi-Fi password"
+	default ""
+
+config GADGET_API_URL
+	string "Impo gadget API base URL"
+	default "https://gadgets.impo.ai"
+
+config GADGET_NOISE_HOST
+	string "Impo Noise WebSocket host (used when fetch_vms gives none)"
+	default "gadgets.impo.ai"
+
+config GADGET_ACCESS_TOKEN
+	string "Development pairing: device access token"
+	default ""
+	help
+	  From POST /api/v1/gadgets/pairings (accessToken). Seeds an empty KV
+	  store; put it only in the untracked app/local.conf.
+
+config GADGET_REFRESH_TOKEN
+	string "Development pairing: device refresh token"
+	default ""
+
+config GADGET_DISPLAY_NAME
+	string "Name shown in Impo"
+	default "ARCS Robot Dog"
+
+config GADGET_MODEL_ID
+	string "model_id sent in link.register"
+	default "arcs-mini-v2.1"
+
+config GADGET_NODE_PREFIX
+	string "node_id prefix (MAC suffix is appended)"
+	default "arcsdog"
+
+config APP_USB_SERIAL_OVERRIDE
+	string "USB serial number override"
+	default ""
+
+config APP_USB_AUDIO_ENABLE
+	bool
+	default n
+
+config APP_USB_CDC_ENABLE
+	bool
+	default n
+
+config POWER_MANAGER_POWER_EN_GPIO_PAD
+	string
+	default "gpiob"
+
+config POWER_MANAGER_POWER_KEY_GPIO_PAD
+	string
+	default "gpiob"
+
+config POWER_MANAGER_USB_DETECT_GPIO_PAD
+	string
+	default "gpiob"
+
+endmenu

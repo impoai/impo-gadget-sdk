@@ -19,7 +19,7 @@ limitations under the License.
 What a gadget can do for the agent, and the words it uses to say so. This is
 the contract between the three layers of the project:
 
-1. **Boards** (`esp32/components/impo/boards/`, `linux/`): one file per piece of
+1. **Boards** (`esp32/components/impo/boards/`, `linux/`, `arcs/boards/`): one file per piece of
    hardware, adapting its screen, speaker, buttons and extras to the board
    interface. A board implements whichever capabilities its hardware has.
 2. **Capabilities** (this document): a fixed vocabulary of commands with their

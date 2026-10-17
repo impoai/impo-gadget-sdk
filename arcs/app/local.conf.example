@@ -1,0 +1,3 @@
+# Copy to app/local.conf (untracked) and fill in.
+CONFIG_GADGET_WIFI_SSID="your-ssid"
+CONFIG_GADGET_WIFI_PASSWORD="your-password"
