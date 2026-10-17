@@ -95,10 +95,69 @@ the avatar, captions and settings (`CONFIG_IMPO_ENABLED`).
 
 | Command | Who has it | Parameters | Result payload |
 |---|---|---|---|
-| `display.show_text` | full UI | `text` (1–200 chars, ASCII shown as is; others replaced) | — |
+| `display.show_text` | full UI; Xteink X4 | `text` (1–200 chars, ASCII shown as is; others replaced) | — |
 | `display.draw_url` | boards that draw images | `url` (public https image), `row`? | — |
+| `display.get_info` | Xteink X4 canvas | — | dimensions, formats, colors, `busy` |
+| `display.clear` | Xteink X4 canvas | `x`?, `y`?, `width`?, `height`?, `color`?, `refresh`? | `buffered`, `queued` |
+| `display.draw_text` | Xteink X4 canvas | `text`, `x`?, `y`?, `width`?, `height`?, `scale`?, `color`?, `background`?, `refresh`? | `buffered`, `queued` |
+| `display.refresh` | Xteink X4 canvas | — | `buffered`, `queued` |
+| `display.set_power_off_image` | Xteink X4 canvas | `reset`? | `stored`, `persistent`, `source`, dimensions |
 | `display.show_animation` | status-light boards | — | — |
 | `avatar.cheer` | full UI | — | — |
+
+On X4, `display.show_text` accepts ASCII only (1–200 characters), queues a monochrome page and returns
+`{"ok":true,"payload":{"queued":true}}`. Use `display.draw_url` for rendered Chinese text.
+`display.show_animation` restores its static connection-status page.
+
+The X4 additionally declares a **480×800 canvas** in `capabilities.screen`.
+The agent chooses its own layout; no image/text areas are reserved. Coordinates
+are integer pixels, origin top left, x right and y down. `display.clear` fills
+a rectangle (default whole screen, white). `display.draw_text` supports 1–512
+ASCII characters, newline/wrap, scale 1–8 (default 3, a 18×24 pixel cell), black
+or white ink and transparent/white/black background. Text clips to its rectangle;
+pixels outside it remain unchanged. Missing rectangle fields default to the
+remaining screen. Invalid or out-of-bounds parameters fail before drawing.
+
+On X4, `display.draw_url` accepts **all four** `x,y,width,height` to preserve
+other regions. Do not combine them with `row`. JPEGs fit and centre within the
+rectangle using 1, 1/2, 1/4 or 1/8 scaling; raw RGB565 has exactly `width` pixels
+per row and up to `height` rows. Render/resize on the agent for exact placement,
+Chinese, other Unicode, mathematical notation or custom fonts. Clear the region
+first if smaller images must have a blank margin. Omitting the rectangle keeps
+the existing whole-page image behavior. HTTP(S) URLs must be reachable by the
+device; plain HTTP uses less of the X4's limited memory.
+
+JPEG input must be **8-bit baseline, three-component YCbCr**, including when
+the intended image is black and white. Progressive, single-component grayscale
+and CMYK JPEGs are unsupported, as are PNG, WebP and GIF. Prepare a compatible
+file with Pillow: `im.convert('RGB').save('out.jpg', format='JPEG',
+progressive=False, subsampling=2)`. Use a direct URL that returns HTTP 200 and
+the actual image bytes; a share/viewer/login page is not an image URL. On
+`invalid_image`, convert the source before retrying instead of retrying the
+unchanged URL. The asset helper also emits compatible `.jpg` files.
+
+Clear/text default to `refresh:false`; image downloads default to `refresh:true`.
+For composition, buffer every operation with `refresh:false`, await each image
+result, then call `display.refresh` once. It returns `queued:true`; poll
+`display.get_info` until `busy:false` before the next edit. A busy drawing call
+returns an error without applying it. The panel performs a full refresh even
+when only a small region changed (about 4 seconds). Downloads are streamed, so
+an error may leave partial buffered pixels; redraw that region. The canvas is
+volatile and resets on reboot. The e-paper retains its last visible image when
+powered off. By default, shutdown paints a goodbye page.
+
+To customize that page, compose the desired canvas, await successful drawing
+and `busy:false`, then call `display.set_power_off_image` with `{}`. It saves
+the current complete canvas, takes no URL, and does not shut down. A successful
+reply confirms flash write/readback (`stored:true, persistent:true`). Subsequent
+drawing does not change the saved image; it survives reboot and is loaded
+locally after the network stops at shutdown. `{"reset":true}` restores the
+default page and returns `stored:false`. `display.get_info.power_off_image`
+reports `supported`, `stored` and `persistent`. Saving a picture while it is
+still downloading or refreshing returns `busy`.
+
+See [the canvas example](esp32/devices/XTEINK_X4_CANVAS.md) for a complete
+image/text composition and Unicode asset preparation.
 
 Showing text wakes the screen. The caption stays until the next thing the
 gadget shows.

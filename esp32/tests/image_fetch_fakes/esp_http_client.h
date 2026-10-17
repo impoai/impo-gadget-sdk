@@ -45,6 +45,8 @@ typedef struct {
     void *data;
     int data_len;
     void *user_data;
+    char *header_key;
+    char *header_value;
 } esp_http_client_event_t;
 
 typedef esp_err_t (*http_event_handle_cb)(esp_http_client_event_t *evt);

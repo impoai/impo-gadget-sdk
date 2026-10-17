@@ -72,6 +72,8 @@ typedef struct {
     int chunk;              // bytes per read, 0 for all at once
     int64_t read_us;        // time each read takes
     int64_t open_us;        // time the connection takes
+    const char *content_type;
+    const char *prefix;
 } response_t;
 
 static response_t g_responses[MAX_RESPONSES];
@@ -79,6 +81,8 @@ static int g_response_count;
 static int g_opens;
 static int g_min_timeout_seen;
 static int64_t g_max_timeout_overrun_us;
+static bool g_jpeg;
+static JRESULT g_jpeg_result;
 
 struct fake_esp_http_client {
     char url[256];
@@ -97,6 +101,8 @@ static void reset_server(void) {
     g_now_us = 1000000;
     g_min_timeout_seen = 1 << 30;
     g_max_timeout_overrun_us = 0;
+    g_jpeg = false;
+    g_jpeg_result = JDR_OK;
 }
 
 static void add_response(response_t r) {
@@ -139,6 +145,11 @@ esp_err_t esp_http_client_open(esp_http_client_handle_t c, int write_len) {
 }
 
 long long esp_http_client_fetch_headers(esp_http_client_handle_t c) {
+    if (c->handler && c->resp->content_type) {
+        esp_http_client_event_t evt = {.event_id = HTTP_EVENT_ON_HEADER, .client = c,
+            .user_data = c->user_data, .header_key = "Content-Type", .header_value = (char *)c->resp->content_type};
+        c->handler(&evt);
+    }
     return (long long)c->resp->body_len;
 }
 
@@ -179,7 +190,11 @@ int esp_http_client_read(esp_http_client_handle_t c, char *buffer, int len) {
         size_t n = (size_t)(len - got) < left ? (size_t)(len - got) : left;
         if (c->resp->chunk && n > (size_t)c->resp->chunk) n = (size_t)c->resp->chunk;
         spend(c, c->resp->read_us);
-        for (size_t i = 0; i < n; i++) buffer[got + i] = (char)(c->sent + i);
+        for (size_t i = 0; i < n; i++) {
+            size_t pos = c->sent + i;
+            buffer[got + i] = g_jpeg && pos < 2 ? (pos ? (char)0xd8 : (char)0xff) : (char)pos;
+            if (c->resp->prefix && pos < strlen(c->resp->prefix)) buffer[got + i] = c->resp->prefix[pos];
+        }
         c->sent += n;
         got += (int)n;
         if (c->handler) {
@@ -260,40 +275,42 @@ bool led_status_display_info(int *width, int *height) {
 }
 
 static int g_rows_drawn;
+static int g_x, g_y, g_width, g_finishes;
 
 bool led_status_draw_rect(int x, int y, int w, int h, const uint16_t *pixels) {
-    (void)x;
-    (void)y;
-    (void)w;
+    CHECK(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= WIDTH && y + h <= HEIGHT,
+          "drawing outside display");
+    if (!g_rows_drawn) { g_x = x; g_y = y; g_width = w; }
     (void)pixels;
     g_rows_drawn += h;
     return true;
 }
 
 void led_status_draw_done(void) {
+    g_finishes++;
 }
 
 JRESULT jd_prepare(JDEC *jd, UINT (*infunc)(JDEC *, BYTE *, UINT), void *pool,
                    UINT sz_pool, void *dev) {
-    (void)jd;
     (void)infunc;
     (void)pool;
     (void)sz_pool;
-    (void)dev;
-    return JDR_FMT1;
+    jd->width = 16; jd->height = 16; jd->device = dev;
+    return g_jpeg ? g_jpeg_result : JDR_FMT1;
 }
 
 JRESULT jd_decomp(JDEC *jd, UINT (*outfunc)(JDEC *, void *, JRECT *), BYTE scale) {
-    (void)jd;
-    (void)outfunc;
-    (void)scale;
-    return JDR_FMT1;
+    if (!g_jpeg) return JDR_FMT1;
+    CHECK(scale == 2, "JPEG should fit using 1/4 scale");
+    uint8_t pixels[4 * 4 * 3] = {0};
+    JRECT rect = {0, 3, 0, 3};
+    return outfunc(jd, pixels, &rect) ? JDR_OK : JDR_INTR;
 }
 
 // ---- Cases -------------------------------------------------------------------
 
 static image_fetch_result_t g_result;
-static char g_message[128];
+static char g_message[512];
 static bool g_done;
 
 static void on_done(const image_fetch_result_t *result, void *user) {
@@ -391,6 +408,65 @@ static void test_slow_redirect_chain_stops_at_the_limit(void) {
     CHECK(g_max_timeout_overrun_us == 0, "an open could block past the deadline");
 }
 
+static void test_image_region(void) {
+    const char *code = NULL, *message = NULL;
+    reset_server();
+    g_done = false; g_rows_drawn = 0;
+    int finishes = g_finishes;
+    add_response((response_t){.status = 200, .body_len = 3 * 5 * 2});
+    CHECK(image_fetch_start_region("http://host/region", 2, 7, 3, 5,
+          on_done, NULL, &code, &message), "region refused");
+    CHECK(g_done && g_result.ok && g_result.width == 3 && g_result.height == 5, "region result");
+    CHECK(g_x == 2 && g_y == 7 && g_width == 3 && g_rows_drawn == 5, "region placement");
+    CHECK(g_finishes == finishes + 1, "must finish once");
+    CHECK(!image_fetch_start_region("http://host/region", 7, 0, 2, 1,
+          on_done, NULL, &code, &message), "out of bounds accepted");
+    reset_server(); g_rows_drawn = 0;
+    add_response((response_t){.status = 200, .body_len = 3 * 6 * 2});
+    CHECK(image_fetch_start_region("http://host/region", 2, 7, 3, 5,
+          on_done, NULL, &code, &message), "region refused");
+    expect_failure("image runs past the last row");
+    reset_server(); finishes = g_finishes;
+    add_response((response_t){.status = 404});
+    fetch("http://host/missing");
+    CHECK(g_finishes == finishes + 1, "HTTP failure must release image reservation");
+    reset_server(); g_rows_drawn = 0; g_jpeg = true;
+    add_response((response_t){.status = 200, .body_len = 2});
+    CHECK(image_fetch_start_region("http://host/photo", 1, 5, 6, 8,
+          on_done, NULL, &code, &message), "JPEG region refused");
+    CHECK(g_result.ok && g_result.scale == 4 && g_width == 4 && g_rows_drawn == 4, "JPEG scale/size");
+    CHECK(g_x == 2 && g_y == 7, "JPEG must centre inside rectangle");
+}
+
+static void test_unsupported_images_are_actionable_and_do_not_draw(void) {
+    const char *types[] = {"text/html; charset=utf-8", "image/png", "image/webp", "application/json"};
+    for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
+        reset_server();
+        add_response((response_t){.status = 200, .body_len = 128, .content_type = types[i]});
+        fetch("http://host/viewer");
+        CHECK(!g_result.ok && !strcmp(g_result.code, "invalid_image") && g_rows_drawn == 0, "unsupported content drew pixels");
+        CHECK(strstr(g_result.message, "direct download URL"), "missing recovery instruction");
+    }
+    const char *prefixes[] = {"\x89PNG\r\n\x1a\n", "GIF89a", "RIFF1234WEBP", "<!doctype html>", "<html"};
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        reset_server();
+        add_response((response_t){.status = 200, .body_len = 128, .prefix = prefixes[i]});
+        fetch("http://host/blob");
+        CHECK(!g_result.ok && g_rows_drawn == 0, "unsupported signature treated as RGB565");
+    }
+    reset_server(); g_jpeg = true; g_jpeg_result = JDR_FMT3;
+    add_response((response_t){.status = 200, .body_len = 128, .content_type = "image/jpeg"});
+    fetch("http://host/progressive.jpg");
+    CHECK(!g_result.ok && !g_rows_drawn && strstr(g_result.message, "convert('RGB')") &&
+          strstr(g_result.message, "do not retry"), "JPEG error must explain how to recover");
+    // A redirect's HTML content type must not reject the final raw image.
+    reset_server();
+    add_response((response_t){.status = 302, .content_type = "text/html", .location = "http://cdn/blob"});
+    add_response((response_t){.status = 200, .body_len = ROW_BYTES, .content_type = "application/octet-stream"});
+    fetch("http://host/redirect");
+    CHECK(g_result.ok && g_rows_drawn == 1, "redirect content type leaked into final image");
+}
+
 int main(void) {
     test_http_redirect_to_https_is_refused();
     test_https_redirect_to_http_is_refused();
@@ -398,6 +474,8 @@ int main(void) {
     test_same_scheme_redirects_are_followed();
     test_trickled_body_hits_the_deadline();
     test_slow_redirect_chain_stops_at_the_limit();
+    test_image_region();
+    test_unsupported_images_are_actionable_and_do_not_draw();
     puts("image_fetch harness: ok");
     return 0;
 }

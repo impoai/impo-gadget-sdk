@@ -63,16 +63,20 @@ set(GADGET_REQUIRES
     mbedtls
     efuse
     impo
+    gadget_power
     # The voice board's. Requirements are resolved before the configuration
     # is loaded, so this is unconditional; unused code is not linked.
     esp_driver_i2s
     esp_driver_pcnt
+    esp_adc
 )
 
 # E-paper has its own status screen in place of led_status.c.
 if(CONFIG_HOMEHUB_LED_BACKEND_RETERMINAL_UC8179
    OR CONFIG_HOMEHUB_LED_BACKEND_RETERMINAL_SPECTRA6)
     list(APPEND GADGET_SRCS "epaper_status.c")
+elseif(CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4)
+    list(APPEND GADGET_SRCS "xteink_x4.c" "display_canvas.c" "display_snapshot.c")
 else()
     list(APPEND GADGET_SRCS "led_status.c")
 endif()

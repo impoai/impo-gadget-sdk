@@ -35,12 +35,13 @@
 #              ESP32-S3-DevKitC-1 v1.1 N8R8 (status LED, no display)
 #   waveshare-c6-lcd-147
 #              Waveshare ESP32-C6-LCD-1.47 with a 172x320 status screen
+#   xteink-x4  Xteink X4 ESP32-C3 with SSD1677 e-paper (experimental)
 #
 # The action defaults to build. Without PORT, flash and monitor use the only
 # matching serial port, if there is exactly one.
 set -euo pipefail
 
-usage() { sed -n '16,38p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '16,39p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 [ $# -ge 1 ] || usage 2
 case "$1" in -h|--help) usage ;; esac
@@ -60,6 +61,11 @@ case "$BOARD" in
   c6-nopsram)
     TARGET=esp32c6
     DEFAULTS="$DEFAULTS;devices/sdkconfig.c6-nopsram"
+    PORTS="/dev/cu.usbmodem* /dev/ttyACM*"
+    ;;
+  xteink-x4)
+    TARGET=esp32c3
+    DEFAULTS="$DEFAULTS;devices/sdkconfig.xteink-x4"
     PORTS="/dev/cu.usbmodem* /dev/ttyACM*"
     ;;
   ideaspark|sensecap-indicator)
@@ -133,6 +139,14 @@ fi
 
 BUILD_DIR="$PROJECT/build-$BOARD"
 cd "$PROJECT"
+# X4 keeps its vendor bootloader and app0. Generic idf.py flash replaces both.
+if [ "$BOARD" = xteink-x4 ] && { [ "$ACTION" = flash ] || [ "$ACTION" = flash-monitor ]; }; then
+  idf.py -B "$BUILD_DIR" -DIDF_TARGET="$TARGET" -DSDKCONFIG="$BUILD_DIR/sdkconfig" \
+    -DSDKCONFIG_DEFAULTS="$DEFAULTS" build
+  python "$PROJECT/tools/xteink_x4_flash.py" "$PORT" "$BUILD_DIR"
+  if [ "$ACTION" = flash ]; then exit 0; fi
+  IDF_ACTIONS=(monitor)
+fi
 exec idf.py -B "$BUILD_DIR" \
   -DIDF_TARGET="$TARGET" \
   -DSDKCONFIG="$BUILD_DIR/sdkconfig" \

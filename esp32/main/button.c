@@ -16,12 +16,16 @@
 
 #include "button.h"
 #include "stack_monitor.h"
+#include "gadget_power.h"
 
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+#include "xteink_x4.h"
+#endif
 
 static const char *TAG = "link.button";
 
@@ -34,6 +38,13 @@ static const char *TAG = "link.button";
 static button_cb s_short_press_cb = NULL;
 static button_cb s_double_press_cb = NULL;
 static button_cb s_long_press_cb = NULL;
+static button_read_cb s_read_power;
+static button_cb s_power_off;
+
+void button_set_power_handler(button_read_cb read_power, button_cb power_off) {
+    s_read_power = read_power;
+    s_power_off = power_off;
+}
 #if CONFIG_HOMEHUB_VOICE
 static volatile button_press_cb s_press_cb = NULL;
 
@@ -43,6 +54,7 @@ void button_set_press_cb(button_press_cb cb) {
 #endif
 
 static void button_task(void *arg) {
+    gadget_power_button_t power_button = {0};
     stack_monitor_t stack = STACK_MONITOR_INIT;
     bool was_pressed = false;
     int64_t press_start = 0;
@@ -54,7 +66,15 @@ static void button_task(void *arg) {
 #endif
 
     while (1) {
+        if (s_read_power && s_power_off &&
+            gadget_power_button_update(&power_button, s_read_power(), esp_timer_get_time() / 1000)) {
+            s_power_off();
+        }
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+        bool pressed = xteink_x4_confirm_pressed();
+#else
         bool pressed = (gpio_get_level(BTN_GPIO) == 0);
+#endif
 
         if (pressed && !was_pressed) {
             press_start = esp_timer_get_time();
@@ -114,6 +134,7 @@ bool button_init(button_cb on_short_press, button_cb on_double_press,
     s_double_press_cb = on_double_press;
     s_long_press_cb = on_long_press;
 
+#if !CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
     gpio_config_t cfg = {
         .pin_bit_mask = (1ULL << BTN_GPIO),
         .mode = GPIO_MODE_INPUT,
@@ -127,7 +148,8 @@ bool button_init(button_cb on_short_press, button_cb on_double_press,
         return false;
     }
 
-    xTaskCreate(button_task, "btn", 4096, NULL, 2, NULL);
+#endif
+    if (xTaskCreate(button_task, "btn", 4096, NULL, 2, NULL) != pdPASS) return false;
     ESP_LOGI(TAG, "button ready (GPIO %d: tap=retry wifi, 2x=rescan, hold %ds=reset setup)",
              BTN_GPIO, LONG_PRESS_MS / 1000);
     return true;

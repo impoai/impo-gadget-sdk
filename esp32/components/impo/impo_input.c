@@ -15,6 +15,7 @@
  */
 
 #include "impo_input.h"
+#include "gadget_power.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -63,7 +64,7 @@ static const char *TAG = "impo_input";
 
 #define GOODBYE_MS 1500        /* let the goodbye animation play */
 #define HINT_TICKS 60          /* 0.6 s: warn that holding powers off */
-#define LONG_TICKS 150         /* 1.5 s: power off */
+#define LONG_TICKS (GADGET_POWER_HOLD_MS / POLL_MS)
 #define SLEEP_CHECK_MS 100
 
 #define SERIAL_RX 1024         /* the driver drops what doesn't fit, so a console line must */
@@ -86,7 +87,7 @@ static void post(impo_ptt_t type, bool wake)
 
 static bool update_power(void);
 
-static void power_off(void)
+static void show_power_off(void)
 {
     ESP_LOGI(TAG, "shutting down");
     impo_state_set_asleep(false);
@@ -96,7 +97,15 @@ static void power_off(void)
     impo_state_set_mode(IMPO_MODE_OFF);
     impo_state_set_caption("GOODBYE!");
     vTaskDelay(pdMS_TO_TICKS(GOODBYE_MS));
-    esp_err_t err = impo_board->power_off();
+}
+
+static void power_off(void)
+{
+    const gadget_power_ops_t ops = {
+        .show_off = show_power_off,
+        .power_off = impo_board->power_off,
+    };
+    esp_err_t err = gadget_power_off(&ops);
     /* Only reached if the board couldn't power off. */
     vTaskDelay(pdMS_TO_TICKS(500));
     ESP_LOGE(TAG, "power-off failed (%s)", esp_err_to_name(err));

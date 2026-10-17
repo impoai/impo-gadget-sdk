@@ -39,6 +39,9 @@
 
 extern "C" {
 #include "cJSON.h"
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+#include "display_canvas.h"
+#endif
 #include "led_status.h"
 #include "ota.h"
 #if CONFIG_IMPO_ENABLED
@@ -90,11 +93,11 @@ static char s_noise_host[256] = NOISE_DEFAULT_HOST;
 #define STABLE_SESSION_MS         30000
 #define VM_REFRESH_FAILURES       3
 
-// On a board with the full UI but no PSRAM or tunnel, only control JSON and Impo's
+// On a board with the full UI (or the X4) but no PSRAM or tunnel, control JSON and Impo's
 // voice notes and live chat replies cross this session, and the whole session has
 // to fit in what internal RAM Wi-Fi, TLS and the display leave, so the buffers
 // below are smaller.
-#if CONFIG_IMPO_ENABLED && !CONFIG_SPIRAM && !CONFIG_HOMEHUB_TUNNEL
+#if (CONFIG_IMPO_ENABLED || CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4) && !CONFIG_SPIRAM && !CONFIG_HOMEHUB_TUNNEL
 #define SMALL_CONTROL_SESSION 1
 #else
 #define SMALL_CONTROL_SESSION 0
@@ -105,22 +108,22 @@ static char s_noise_host[256] = NOISE_DEFAULT_HOST;
 // batches, so scratch must fit a full batch plus ServiceFrame/envelope overhead.
 // Chat subscriptions deliver 16 KB body chunks plus framing, even on boards
 // without PSRAM. Reserve enough inbound space for those frames. Not on the
-// ESP32-C3 AI Passport: three 17 KB buffers beside its UI leave too little to
+// ESP32-C3 AI Passport / X4: three 17 KB buffers beside the display leave too little to
 // upload a voice note. It takes 12 KB, as the PSRAM boards' session does.
 // Chat events arrive one per frame; a frame over that ends the session (it
 // can't be skipped: Noise's nonces and the ordered framer would desync), the
 // request in flight ends with NOISE_CTRL_REQ_TOO_LARGE, and the session
 // reconnects.
-#if SMALL_CONTROL_SESSION && CONFIG_IMPO_BOARD_AI_PASSPORT
+#if SMALL_CONTROL_SESSION && (CONFIG_IMPO_BOARD_AI_PASSPORT || CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4)
 #define SVC_FRAME_SCRATCH (12 * 1024)
 #else
 #define SVC_FRAME_SCRATCH (SMALL_CONTROL_SESSION ? 17 * 1024 : 12288)
 #endif
 
-// The ADV and the ESP32-C3 AI Passport cannot allocate the session with the
+// The ADV and ESP32-C3 AI Passport / X4 cannot allocate the session with the
 // larger inbound buffers and the usual outbound buffers together. Keep this
 // reduction local to those boards.
-#if SMALL_CONTROL_SESSION && (CONFIG_IMPO_BOARD_M5STACK_CARDPUTER_ADV || CONFIG_IMPO_BOARD_AI_PASSPORT)
+#if SMALL_CONTROL_SESSION && (CONFIG_IMPO_BOARD_M5STACK_CARDPUTER_ADV || CONFIG_IMPO_BOARD_AI_PASSPORT || CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4)
 #define CARDPUTER_CONTROL_SESSION 1
 #else
 #define CARDPUTER_CONTROL_SESSION 0
@@ -149,7 +152,7 @@ static char s_noise_host[256] = NOISE_DEFAULT_HOST;
 #define WS_BUF_SIZE (SMALL_CONTROL_SESSION ? 7 * 1024 : 16 * 1024)
 #endif
 // Inbound WebSocket frames: SVC_FRAME_SCRATCH plus framing and the AEAD tag.
-#if SMALL_CONTROL_SESSION && CONFIG_IMPO_BOARD_AI_PASSPORT
+#if SMALL_CONTROL_SESSION && (CONFIG_IMPO_BOARD_AI_PASSPORT || CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4)
 #define WS_RX_BUF_SIZE (SVC_FRAME_SCRATCH + 1024)
 #else
 #define WS_RX_BUF_SIZE (SMALL_CONTROL_SESSION ? 17 * 1024 : WS_BUF_SIZE)
@@ -1286,6 +1289,12 @@ static char *build_register_json(void) {
 #if CONFIG_IMPO_ENABLED
     impo_commands_capabilities(params);   // what this gadget has, see CAPABILITIES.md
 #endif
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+    cJSON *caps = cJSON_AddObjectToObject(params, "capabilities");
+    cJSON_AddItemToObject(caps, "screen", display_canvas_info());
+    cJSON_AddBoolToObject(caps, "buttons", true);
+    cJSON_ReplaceItemInObject(params, "model_id", cJSON_CreateString("xteink-x4"));
+#endif
 
     cJSON *commands = cJSON_CreateObject();
     cJSON *name_required = cJSON_CreateObject();
@@ -1310,6 +1319,18 @@ static char *build_register_json(void) {
 
 #if CONFIG_IMPO_ENABLED
     impo_commands_describe(commands);
+#endif
+
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+    display_canvas_describe(commands);
+    cJSON *text_required = cJSON_CreateObject();
+    cJSON_AddItemToObject(text_required, "text", string_param("1 to 200 ASCII characters."));
+    add_command(commands, "display.show_text",
+                "Queue 1 to 200 ASCII characters on the X4 e-paper screen. "
+                "Newlines wrap; non-ASCII glyphs are not supported. Use display.draw_url "
+                "for Chinese text rendered into an image. Refresh takes about 4 seconds. "
+                "display.show_animation restores the connection status page.",
+                text_required, nullptr);
 #endif
 
 #if CONFIG_HOMEHUB_DISPLAY_COMMANDS
@@ -1381,6 +1402,29 @@ static char *build_register_json(void) {
                                 "Row to draw the top of the image at; default 0.");
 #endif
         cJSON_AddItemToObject(url_optional, "row", top_param);
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+        snprintf(desc, sizeof(desc), "Draw an image on the 480x800 black/white canvas. "
+                 "Give x,y,width,height together to preserve other regions; otherwise replace the whole screen. "
+                 "JPEG must be 8-bit baseline, 3-component YCbCr: NO progressive or single-component grayscale JPEG, PNG, WebP or HTML. "
+                 "Prepare with Pillow: im.convert('RGB').save('out.jpg',format='JPEG',progressive=False,subsampling=2). "
+                 "Publish a direct download URL (HTTP 200 image bytes, not a sharing/viewer/login page); check the downloaded file first. "
+                 "On invalid_image, convert the file before retrying; do not retry the unchanged URL. "
+                 "JPEG shrinks by 1/2,1/4,1/8 as needed and centres inside the rectangle. "
+                 "Or send big-endian RGB565 with width pixels per row. For exact placement, resize on the agent. "
+                 "Use refresh:false to compose images and text, then display.refresh once. "
+                 "Download errors may leave partial buffered pixels: redraw the region. "
+                 "http:// uses less RAM; HTTPS may return out_of_memory. Unicode text/formulas should be rendered into an image. "
+                 "One full e-paper refresh takes about 4 seconds.");
+        const char *region_keys[] = {"x", "y", "width", "height"};
+        for (const char *key : region_keys) {
+            cJSON *p = cJSON_AddObjectToObject(url_optional, key);
+            cJSON_AddStringToObject(p, "type", "integer");
+            cJSON_AddStringToObject(p, "description", "Rectangle in pixels. Supply all four; do not combine with row.");
+        }
+        cJSON *show = cJSON_AddObjectToObject(url_optional, "refresh");
+        cJSON_AddStringToObject(show, "type", "boolean");
+        cJSON_AddStringToObject(show, "description", "Refresh when downloaded; default true. False buffers until display.refresh.");
+#endif
         add_command(commands, "display.draw_url", desc, url_required, url_optional);
         // The six-colour e-paper may first finish a status screen refresh,
         // then takes as long again for the image.

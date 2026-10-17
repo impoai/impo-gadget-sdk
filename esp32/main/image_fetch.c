@@ -81,19 +81,22 @@ typedef struct {
     void *user;
     esp_http_client_handle_t http;
     int width, height;
+    int region_x, region_y;
+    bool region;
     // The scheme the task's stack and memory budget were sized for. Redirects
     // may not change it: TLS on the HTTP stack overflows it, and an HTTPS
     // fetch must not continue in cleartext.
     bool https;
     int64_t deadline_us;
-    // Two bytes read to sniff the format, handed back to the first read.
-    uint8_t peek[2];
+    // Prefix read to reject unsupported images and viewer pages before drawing.
+    uint8_t peek[16];
     size_t peek_len;
     size_t bytes;
     bool eof;
     bool low_memory;
     bool timed_out;
     bool scheme_changed;
+    bool unsupported_content, jpeg_content;
     // JPEG output placement and one MCU converted for the panel.
     int x0, y0;
     uint16_t mcu[JPEG_MCU_PIXELS];
@@ -151,8 +154,8 @@ static int fetch_read(fetch_t *f, uint8_t *buf, size_t len) {
     size_t have = 0;
     while (have < len && f->peek_len) {
         buf[have++] = f->peek[0];
-        f->peek[0] = f->peek[1];
         f->peek_len--;
+        memmove(f->peek, f->peek + 1, f->peek_len);
     }
     while (have < len && !f->eof) {
         if (internal_free() < FETCH_FLOOR_BYTES) {
@@ -195,7 +198,7 @@ static const char *draw_raw(fetch_t *f, int *rows_drawn) {
             err = "image runs past the last row";
             break;
         }
-        if (rows && !led_status_draw_rect(0, y, f->width, rows, (const uint16_t *)buf)) {
+        if (rows && !led_status_draw_rect(f->region_x, f->region_y + y, f->width, rows, (const uint16_t *)buf)) {
             err = "display write failed";
             break;
         }
@@ -260,8 +263,8 @@ static const char *draw_jpeg(fetch_t *f, int *out_w, int *out_h, int *out_scale)
         if (w > f->width || h > avail) {
             err = "JPEG is too large even at 1/8 scale";
         } else {
-            f->x0 = (f->width - w) / 2;
-            f->y0 = CENTRED(f) ? (f->height - h) / 2 : f->row;
+            f->x0 = f->region_x + (f->width - w) / 2;
+            f->y0 = f->region_y + ((CENTRED(f) || f->region) ? (f->height - h) / 2 : f->row);
             rc = jd_decomp(&jd, jpeg_out, scale);
         }
     }
@@ -269,7 +272,10 @@ static const char *draw_jpeg(fetch_t *f, int *out_w, int *out_h, int *out_scale)
         err = f->low_memory ? "memory ran low"
             : rc == JDR_INP ? "download failed"
             : rc == JDR_INTR ? "display write failed"
-            : rc == JDR_FMT3 ? "unsupported JPEG: use baseline, not progressive"
+            : rc == JDR_FMT3 || rc == JDR_FMT2 ?
+                "unsupported JPEG: use 8-bit baseline 3-component YCbCr, not progressive/grayscale/CMYK. "
+                "Pillow: im.convert('RGB').save('out.jpg',progressive=False,subsampling=2). "
+                "Publish the converted file or use big-endian RGB565; do not retry the unchanged URL"
             : "not a valid JPEG";
     }
     free(pool);
@@ -283,6 +289,14 @@ static const char *draw_jpeg(fetch_t *f, int *out_w, int *out_h, int *out_scale)
 // raises an event after each socket read, which re-clamps the next one.
 static esp_err_t on_http_event(esp_http_client_event_t *evt) {
     fetch_t *f = evt->user_data;
+    if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->header_key && evt->header_value &&
+        strcasecmp(evt->header_key, "Content-Type") == 0) {
+        const char *type = evt->header_value;
+        f->jpeg_content = strncasecmp(type, "image/jpeg", 10) == 0 || strncasecmp(type, "image/jpg", 9) == 0;
+        f->unsupported_content = strncasecmp(type, "text/", 5) == 0 ||
+            strncasecmp(type, "application/json", 16) == 0 ||
+            (strncasecmp(type, "image/", 6) == 0 && !f->jpeg_content);
+    }
     if (evt->event_id == HTTP_EVENT_ON_DATA || evt->event_id == HTTP_EVENT_ON_HEADER) {
         within_deadline(f);
     }
@@ -301,6 +315,7 @@ static bool same_scheme(fetch_t *f) {
 static esp_err_t open_following_redirects(fetch_t *f, int *status) {
     for (int i = 0;; i++) {
         if (!within_deadline(f)) return ESP_ERR_TIMEOUT;
+        f->unsupported_content = f->jpeg_content = false;
         esp_err_t err = esp_http_client_open(f->http, 0);
         if (err != ESP_OK) return err;
         esp_http_client_fetch_headers(f->http);
@@ -350,13 +365,26 @@ static void fetch_task(void *arg) {
     } else if (status != 200) {
         snprintf(msg, sizeof(msg), "server answered HTTP %d", status);
         result.message = msg;
+    } else if (f->unsupported_content) {
+        result.code = "invalid_image";
+        result.message = "URL must return JPEG or raw RGB565 bytes, not HTML/text/PNG/WebP/GIF. "
+            "Convert to RGB baseline JPEG and use a direct download URL, not a viewer page";
     } else {
         int n = fetch_read(f, f->peek, sizeof(f->peek));
         f->peek_len = n > 0 ? (size_t)n : 0;
         const char *fail;
-        if (f->peek_len == 2 && f->peek[0] == 0xFF && f->peek[1] == 0xD8) {
+        if (f->peek_len >= 2 && f->peek[0] == 0xFF && f->peek[1] == 0xD8) {
             result.format = "jpeg";
             fail = draw_jpeg(f, &result.width, &result.height, &result.scale);
+        } else if (f->jpeg_content ||
+                   (f->peek_len >= 8 && !memcmp(f->peek, "\x89PNG\r\n\x1a\n", 8)) ||
+                   (f->peek_len >= 6 && (!memcmp(f->peek, "GIF87a", 6) || !memcmp(f->peek, "GIF89a", 6))) ||
+                   (f->peek_len >= 12 && !memcmp(f->peek, "RIFF", 4) && !memcmp(f->peek + 8, "WEBP", 4)) ||
+                   (f->peek_len >= 5 && (!strncasecmp((char *)f->peek, "<html", 5) ||
+                                        !strncasecmp((char *)f->peek, "<?xml", 5))) ||
+                   (f->peek_len >= 9 && !strncasecmp((char *)f->peek, "<!doctype", 9))) {
+            fail = "not supported image bytes: convert PNG/WebP/GIF to RGB baseline JPEG or RGB565; "
+                   "use a direct download URL, not an HTML viewer/login page";
         } else {
             int rows = 0;
             result.format = "rgb565";
@@ -365,8 +393,6 @@ static void fetch_task(void *arg) {
             fail = draw_raw(f, &rows);
             result.height = rows;
         }
-        // Show what arrived, even if the download broke off.
-        led_status_draw_done();
         if (fail && f->timed_out) fail = "download timed out";
         if (fail) {
             result.message = fail;
@@ -379,6 +405,9 @@ static void fetch_task(void *arg) {
             result.code = NULL;
         }
     }
+    // Always release a reserved image canvas, including connection failures.
+    // Show what arrived, even if the download broke off.
+    led_status_draw_done();
     if (f->http) esp_http_client_cleanup(f->http);
 
     result.bytes = f->bytes;
@@ -395,8 +424,9 @@ static void fetch_task(void *arg) {
     vTaskDelete(NULL);
 }
 
-bool image_fetch_start(const char *url, int row, image_fetch_done_cb done,
-                       void *user, const char **code, const char **message) {
+static bool start(const char *url, int row, int x, int y, int region_w, int region_h,
+                  bool region, image_fetch_done_cb done,
+                  void *user, const char **code, const char **message) {
     int width, height;
     if (!led_status_display_info(&width, &height)) {
         *code = "unsupported";
@@ -412,6 +442,12 @@ bool image_fetch_start(const char *url, int row, image_fetch_done_cb done,
     if (row < MIN_ROW || row >= height) {
         *code = "invalid_params";
         *message = "row is off the screen";
+        return false;
+    }
+    if (region && (x < 0 || y < 0 || x >= width || y >= height ||
+        region_w <= 0 || region_h <= 0 || region_w > width - x || region_h > height - y)) {
+        *code = "invalid_params";
+        *message = "image rectangle must fit the screen";
         return false;
     }
     bool expected = false;
@@ -448,8 +484,11 @@ bool image_fetch_start(const char *url, int row, image_fetch_done_cb done,
     f->row = row;
     f->done = done;
     f->user = user;
-    f->width = width;
-    f->height = height;
+    f->width = region ? region_w : width;
+    f->height = region ? region_h : height;
+    f->region = region;
+    f->region_x = x;
+    f->region_y = y;
     if (xTaskCreate(fetch_task, "image", stack, f, 4, NULL) != pdPASS) {
         free(f->url);
         free(f);
@@ -461,7 +500,24 @@ bool image_fetch_start(const char *url, int row, image_fetch_done_cb done,
     return true;
 }
 
+bool image_fetch_start(const char *url, int row, image_fetch_done_cb done,
+                       void *user, const char **code, const char **message) {
+    return start(url, row, 0, 0, 0, 0, false, done, user, code, message);
+}
+bool image_fetch_start_region(const char *url, int x, int y, int width, int height,
+                              image_fetch_done_cb done, void *user,
+                              const char **code, const char **message) {
+    return start(url, 0, x, y, width, height, true, done, user, code, message);
+}
+
 #else
+
+bool image_fetch_start_region(const char *url, int x, int y, int width, int height,
+                              image_fetch_done_cb done, void *user,
+                              const char **code, const char **message) {
+    (void)x; (void)y; (void)width; (void)height;
+    return image_fetch_start(url, 0, done, user, code, message);
+}
 
 bool image_fetch_start(const char *url, int row, image_fetch_done_cb done,
                        void *user, const char **code, const char **message) {

@@ -188,6 +188,7 @@ status screen.
 | M5Stack Core2 (v1.0) | UI, push-to-talk on the touch strip, touch menu, images | `tools/impo/board.sh build core2` |
 | Freenove FNK0104B | UI, touch, BOOT push-to-talk, settings, images | `tools/impo/board.sh build fnk0104b` |
 | VN ESP32-S3 1.83-inch NV3023 | UI, BOOT push-to-talk, Vol+/Vol- menu, images | `tools/impo/board.sh build vn183` |
+| Xteink X4 (experimental, SSD1677) | E-paper status, text and images; Confirm to pair | `tools/board.sh xteink-x4 build` ([flash/recovery](devices/XTEINK_X4.md)) |
 | FoloToy AI Passport (experimental) | UI, push-to-talk with text replies, three-button menu | `tools/impo/board.sh build ai-passport` |
 
 See [`devices/`](devices) for each board's hardware, features, and where to

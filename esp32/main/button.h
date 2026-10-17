@@ -19,6 +19,11 @@
 #include <stdbool.h>
 
 typedef void (*button_cb)(void);
+typedef bool (*button_read_cb)(void);
+
+// Optional, separate power key. Register before button_init(). The shared
+// power policy ignores the boot/wake hold and handles one 1.5-second hold.
+void button_set_power_handler(button_read_cb read_power, button_cb power_off);
 
 bool button_init(button_cb on_short_press, button_cb on_double_press,
                  button_cb on_long_press);

@@ -21,7 +21,17 @@
 #include "impo_glue.h"
 #endif
 
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+#include "xteink_x4.h"
+#endif
+
 void app_main(void) {
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+    if (!xteink_x4_init()) {
+        ESP_LOGE("link.main", "X4 input/power initialization failed");
+        return;
+    }
+#endif
 #if CONFIG_HOMEHUB_SUPPORT_BUG_REPORT
     if (!diagnostic_log_init()) {
         ESP_LOGW("link.main",

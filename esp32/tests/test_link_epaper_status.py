@@ -73,14 +73,16 @@ class LinkEpaperStatusTest(unittest.TestCase):
         cmake = (ROOT / "main/CMakeLists.txt").read_text()
         self.assertRegex(cmake, r'if\(CONFIG_HOMEHUB_LED_BACKEND_RETERMINAL_UC8179\s+'
                                 r'OR CONFIG_HOMEHUB_LED_BACKEND_RETERMINAL_SPECTRA6\)\s*'
-                                r'list\(APPEND GADGET_SRCS "epaper_status.c"\)\s*else\(\)\s*'
+                                r'list\(APPEND GADGET_SRCS "epaper_status.c"\)\s*'
+                                r'elseif\(CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4\)\s*'
+                                r'list\(APPEND GADGET_SRCS "xteink_x4.c" "display_canvas.c" "display_snapshot.c"\)\s*else\(\)\s*'
                                 r'list\(APPEND GADGET_SRCS "led_status.c"\)')
         # Both implementations provide the whole display interface.
         header = (ROOT / "main/led_status.h").read_text()
         for name in re.findall(r"^\w[\w ]*?\b(led_status_\w+)\(", header, re.M):
             if name in ("led_status_set_voice", "led_status_set_level", "led_status_show_volume"):
                 continue
-            for impl in ("led_status.c", "epaper_status.c"):
+            for impl in ("led_status.c", "epaper_status.c", "xteink_x4.c"):
                 self.assertRegex((ROOT / "main" / impl).read_text(), rf"\n\w[\w ]*\b{name}\(",
                                  f"{impl} lacks {name}")
         fetch = (ROOT / "main/image_fetch.c").read_text()

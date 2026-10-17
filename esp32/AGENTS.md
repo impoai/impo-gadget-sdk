@@ -74,6 +74,7 @@ before adding a feature to one.
 | Waveshare ESP32-S3-Touch-LCD-7 | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-lcd7` | `tools/impo/board.sh build lcd7` |
 | M5Stack StickC Plus2 | `esp32` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-stickc-plus2` | manual |
 | M5Stack Core2 (v1.0) | `esp32` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-core2` | `tools/impo/board.sh build core2` |
+| Xteink X4 (experimental, SSD1677) | `esp32c3` | `devices/sdkconfig.xteink-x4` | `tools/board.sh xteink-x4` (preserves bootloader and app0; see `devices/XTEINK_X4.md`) |
 | FoloToy AI Passport (experimental) | `esp32c3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-ai-passport` | `tools/impo/board.sh build ai-passport` |
 
 The default profile expects the C5 DevKitC-1: an addressable status LED on

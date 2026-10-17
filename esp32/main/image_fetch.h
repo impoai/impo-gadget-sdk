@@ -63,6 +63,12 @@ typedef void (*image_fetch_done_cb)(const image_fetch_result_t *result, void *us
 bool image_fetch_start(const char *url, int row, image_fetch_done_cb done,
                        void *user, const char **code, const char **message);
 
+// Draw inside a screen rectangle. JPEG fits and centres inside it; raw rows
+// have exactly width pixels. The backend controls preservation and refresh.
+bool image_fetch_start_region(const char *url, int x, int y, int width, int height,
+                              image_fetch_done_cb done, void *user,
+                              const char **code, const char **message);
+
 #ifdef __cplusplus
 }
 #endif

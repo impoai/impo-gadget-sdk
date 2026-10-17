@@ -16,6 +16,7 @@
 
 #include "app.h"
 #include "stack_monitor.h"
+#include "gadget_power.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -35,6 +36,7 @@
 #endif
 #include "esp_timer.h"
 #include "esp_system.h"
+#include "esp_wifi.h"
 #include "esp_attr.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
@@ -55,6 +57,10 @@
 #include "image_fetch.h"
 #include "noise_tunnel.h"
 #include "led_status.h"
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+#include "xteink_x4.h"
+#include "display_canvas.h"
+#endif
 #include "button.h"
 #include "tunnel_netif.h"
 #include "net_discovery.h"
@@ -560,6 +566,25 @@ static void disconnect_vm_transports(void) {
     tunnel_netif_set_link(false);
     strcpy(s_ui_ws, "down");
     strcpy(s_ui_raw, "down");
+}
+
+// Shared by full-UI boards and status-screen boards. Keep the operation gate
+// until power is gone, so provisioning/token writes cannot race shutdown.
+static esp_err_t prepare_power_off(void) {
+    if (!operation_gate_take(pdMS_TO_TICKS(5000), "power off")) return ESP_ERR_TIMEOUT;
+    ESP_LOGI(TAG, "power off: stopping sessions and radios; keeping saved setup");
+    disconnect_vm_transports();
+    wifi_mgr_disconnect();
+    esp_wifi_stop();
+    ble_server_full_shutdown();
+    return ESP_OK;
+}
+
+static void recover_power_off(void) {
+    // Radios were shut down and the operation gate is held. Reboot to restore
+    // them from saved settings if a board's power-off operation failed.
+    ESP_LOGE(TAG, "hardware power-off returned; rebooting with saved setup");
+    esp_restart();
 }
 
 static bool clear_setup_credentials(void) {
@@ -1558,6 +1583,40 @@ static void draw_url_done(const image_fetch_result_t *r, void *user) {
 }
 #endif
 
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+static cJSON *command_error(const char *code, const char *message);
+typedef struct {
+    noise_ctrl_session_generation_t session_generation;
+    char request_id[64];
+    bool reset;
+} power_image_ctx_t;
+
+static void power_image_task(void *arg) {
+    power_image_ctx_t *ctx = arg;
+    esp_err_t err = xteink_x4_save_power_off_image(ctx->reset);
+    cJSON *result;
+    if (err == ESP_OK) {
+        result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON *payload = cJSON_AddObjectToObject(result, "payload");
+        cJSON_AddBoolToObject(payload, "stored", !ctx->reset);
+        cJSON_AddBoolToObject(payload, "persistent", true);
+        cJSON_AddStringToObject(payload, "source", ctx->reset ? "default" : "canvas");
+        cJSON_AddNumberToObject(payload, "width", 480);
+        cJSON_AddNumberToObject(payload, "height", 800);
+    } else if (err == ESP_ERR_INVALID_STATE) {
+        result = command_error("busy", "draw the desired canvas first; wait for busy:false, then retry saving");
+    } else if (err == ESP_ERR_NOT_SUPPORTED) {
+        result = command_error("unavailable", "power-off image storage is unavailable for this application layout");
+    } else {
+        result = command_error("storage_failed", "power-off image write or readback failed");
+    }
+    noise_ctrl_send_command_result(ctx->session_generation, ctx->request_id, result);
+    free(ctx);
+    vTaskDelete(NULL);
+}
+#endif
+
 #if CONFIG_IMPO_CAMERA
 typedef struct {
     noise_ctrl_session_generation_t session_generation;
@@ -1708,7 +1767,14 @@ static void ws_control_task(void *arg) {
             // The keeper reconnects to the same VM (s_impo_resume_vm) and the
             // session registers afresh, name included.
             noise_ctrl_disconnect();
+#if CONFIG_IMPO_ENABLED
             s_impo_resume_vm = true;
+#else
+            // Status-only boards have no full-UI keeper to resume the session.
+            if (!noise_ctrl_reconnect(strcmp(s_ui_wifi, "down") == 0 ? NULL : s_ui_wifi)) {
+                ESP_LOGW(TAG, "could not resume control session after rename");
+            }
+#endif
             break;
         case WS_CONTROL_UNPAIR:
             if (args->setup_credentials_cleared) {
@@ -1867,6 +1933,52 @@ static cJSON *on_ws_command(
     cJSON *ui_result = impo_commands_run(command, params);
     if (ui_result) return ui_result;
 #endif
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+    cJSON *canvas_result = display_canvas_command(command, params);
+    if (canvas_result) return canvas_result;
+    if (strcmp(command, "display.set_power_off_image") == 0) {
+        if (params && !cJSON_IsObject(params)) return command_error("invalid_params", "params must be an object");
+        cJSON *field;
+        cJSON_ArrayForEach(field, params) {
+            if (!field->string || strcmp(field->string, "reset") || !cJSON_IsBool(field))
+                return command_error("invalid_params", "only reset:boolean is accepted; draw the image first, then call this with {}");
+        }
+        power_image_ctx_t *ctx = calloc(1, sizeof(*ctx));
+        cJSON *async = cJSON_CreateObject();
+        if (!ctx || !async || !cJSON_AddBoolToObject(async, "_async", true)) {
+            free(ctx);
+            cJSON_Delete(async);
+            return command_error("out_of_memory", "could not start image storage task");
+        }
+        ctx->session_generation = session_generation;
+        strncpy(ctx->request_id, request_id, sizeof(ctx->request_id) - 1);
+        ctx->reset = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(params, "reset"));
+        if (xTaskCreate(power_image_task, "power_image", 4096, ctx, 3, NULL) != pdPASS) {
+            free(ctx);
+            cJSON_Delete(async);
+            return command_error("out_of_memory", "could not start image storage task");
+        }
+        return async;
+    }
+    if (strcmp(command, "display.show_text") == 0) {
+        cJSON *text = cJSON_GetObjectItem(params, "text");
+        if (!cJSON_IsString(text) || !text->valuestring || !text->valuestring[0] ||
+            strlen(text->valuestring) > 200) {
+            return command_error("invalid_param", "text must contain 1 to 200 ASCII characters");
+        }
+        for (const unsigned char *p = (const unsigned char *)text->valuestring; *p; ++p) {
+            if ((*p < 32 && *p != '\n') || *p > 126)
+                return command_error("invalid_param", "use an image for non-ASCII text");
+        }
+        if (!xteink_x4_show_text(text->valuestring))
+            return command_error("busy", "display is unavailable or an image is downloading");
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON *payload = cJSON_AddObjectToObject(result, "payload");
+        cJSON_AddBoolToObject(payload, "queued", true);
+        return result;
+    }
+#endif
 #if CONFIG_HOMEHUB_DISPLAY_COMMANDS
     if (strcmp(command, "display.draw_url") == 0) {
         cJSON *url = cJSON_GetObjectItem(params, "url");
@@ -1874,13 +1986,53 @@ static cJSON *on_ws_command(
         if (!cJSON_IsString(url) || !url->valuestring || !url->valuestring[0]) {
             return command_error("missing_param", "url is required");
         }
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+        int rect[4] = {0};
+        const char *keys[] = {"x", "y", "width", "height"};
+        bool region = false;
+        for (int i = 0; i < 4; i++) region |= cJSON_HasObjectItem(params, keys[i]);
+        if (region) {
+            if (row) return command_error("invalid_params", "use x/y/width/height or row, not both");
+            for (int i = 0; i < 4; i++) {
+                cJSON *v = cJSON_GetObjectItemCaseSensitive(params, keys[i]);
+                if (!cJSON_IsNumber(v) || v->valuedouble < 0 || v->valuedouble > 800 ||
+                    v->valuedouble != v->valueint)
+                    return command_error("invalid_params", "x, y, width and height must all be integers");
+                rect[i] = v->valueint;
+            }
+            if (rect[0] >= 480 || rect[1] >= 800 || rect[2] <= 0 || rect[3] <= 0 ||
+                rect[2] > 480 - rect[0] || rect[3] > 800 - rect[1])
+                return command_error("invalid_params", "image rectangle must fit the 480x800 canvas");
+        }
+        cJSON *show = cJSON_GetObjectItemCaseSensitive(params, "refresh");
+        if (show && !cJSON_IsBool(show)) return command_error("invalid_params", "refresh must be boolean");
+        if (row && (!cJSON_IsNumber(row) || row->valuedouble < 0 || row->valuedouble >= 800 ||
+                    row->valuedouble != row->valueint))
+            return command_error("invalid_params", "row must be an integer on the screen");
+#endif
         draw_url_ctx_t *ctx = calloc(1, sizeof(*ctx));
         if (!ctx) return command_error("out_of_memory", "failed to allocate");
         ctx->session_generation = session_generation;
         strncpy(ctx->request_id, request_id, sizeof(ctx->request_id) - 1);
         const char *code, *message;
-        if (!image_fetch_start(url->valuestring, cJSON_IsNumber(row) ? row->valueint : IMAGE_FETCH_DEFAULT_ROW,
-                               draw_url_done, ctx, &code, &message)) {
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+        if (!xteink_x4_begin_image(region, !show || cJSON_IsTrue(show))) {
+            free(ctx);
+            return command_error("busy", "display is refreshing, downloading or shutting down; retry");
+        }
+        bool started = region
+            ? image_fetch_start_region(url->valuestring, rect[0], rect[1], rect[2], rect[3],
+                                       draw_url_done, ctx, &code, &message)
+            : image_fetch_start(url->valuestring, cJSON_IsNumber(row) ? row->valueint : IMAGE_FETCH_DEFAULT_ROW,
+                                draw_url_done, ctx, &code, &message);
+#else
+        bool started = image_fetch_start(url->valuestring, cJSON_IsNumber(row) ? row->valueint : IMAGE_FETCH_DEFAULT_ROW,
+                                        draw_url_done, ctx, &code, &message);
+#endif
+        if (!started) {
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+            xteink_x4_cancel_image();
+#endif
             free(ctx);
             return command_error(code, message);
         }
@@ -1889,6 +2041,12 @@ static cJSON *on_ws_command(
         return async;
     }
     if (strcmp(command, "display.show_animation") == 0) {
+#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
+        cJSON *info = display_canvas_info();
+        bool busy = cJSON_IsTrue(cJSON_GetObjectItem(info, "busy"));
+        cJSON_Delete(info);
+        if (busy) return command_error("busy", "wait for the image or refresh to finish");
+#endif
         led_status_show_animation();
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
@@ -2361,6 +2519,7 @@ bool app_hatch_vm_credentials(const char *want_vm, char *vm_id, size_t id_cap,
 
 #if CONFIG_IMPO_ENABLED
 void app_ble_companion_set(bool advertise) {
+    if (gadget_power_is_shutting_down()) return;
     if (advertise) start_ble_setup_server_if_needed();
     ble_server_set_companion_advertising(advertise);
     if (config_setup_complete()) ui_set_ble(advertise ? "companion" : "off");
@@ -2523,6 +2682,7 @@ void app_run(void) {
         ESP_LOGE(TAG, "failed to initialize setup operation gate");
         abort();
     }
+    gadget_power_set_system_hooks(prepare_power_off, recover_power_off);
 
     config_store_init();
     wifi_known_init();
@@ -2794,6 +2954,10 @@ void app_run(void) {
     stack_monitor_t stack = STACK_MONITOR_INIT;
     tunnel_stats_t prev_tun = {0};
     while (1) {
+        if (gadget_power_is_shutting_down()) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
         if (atomic_exchange_explicit(&s_setup_reset_pending, false,
                                      memory_order_acq_rel)) {
             reset_setup_from_control("deferred setup reset");

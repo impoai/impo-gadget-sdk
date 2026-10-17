@@ -16,6 +16,21 @@
 set(GADGET_CONFIG_REGEN_HINT
     "Generated sdkconfig values override newer defaults; regenerate the active isolated profile configuration.")
 
+# The X4 development port retains the vendor bootloader and USB recovery.
+if(CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4 AND
+   (CONFIG_SECURE_BOOT OR CONFIG_SECURE_FLASH_ENC_ENABLED OR
+    CONFIG_HOMEHUB_PAIRING_EFUSE_AUTH OR CONFIG_HOMEHUB_NVS_ENCRYPTION OR
+    CONFIG_NVS_ENCRYPTION OR CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT OR
+    CONFIG_HOMEHUB_OTA_ENABLED))
+    message(FATAL_ERROR "X4 requires the recoverable development security profile and USB updates.")
+endif()
+
+if(CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4 AND
+   (NOT CONFIG_ESP_COREDUMP_ENABLE_TO_NONE OR
+    (NOT CONFIG_SPI_FLASH_DANGEROUS_WRITE_ABORTS AND NOT CONFIG_SPI_FLASH_DANGEROUS_WRITE_FAILS)))
+    message(FATAL_ERROR "X4 reserves the coredump data partition for its power-off image and requires flash write protection.")
+endif()
+
 if(NOT CONFIG_CJSON_NESTING_LIMIT EQUAL 16)
     message(FATAL_ERROR
         "ESP32 Device SDK requires cJSON nesting limit 16. ${GADGET_CONFIG_REGEN_HINT}")
@@ -23,15 +38,15 @@ endif()
 
 # Old generated profiles retain 64 KiB TCP buffers and can exhaust the DMA heap
 # during tunnel bursts even when sdkconfig.defaults has been updated.
-# TCP limits: the no-PSRAM Cardputer and AI Passport have no tunnel and use
+# TCP limits: the no-PSRAM Cardputer, AI Passport and X4 have no tunnel and use
 # four-MSS windows.
 if((NOT CONFIG_LWIP_TCP_SND_BUF_DEFAULT EQUAL 16384 OR
     NOT CONFIG_LWIP_TCP_WND_DEFAULT EQUAL 16384) AND
-   NOT ((CONFIG_IMPO_BOARD_M5STACK_CARDPUTER_ADV OR CONFIG_IMPO_BOARD_AI_PASSPORT) AND NOT CONFIG_SPIRAM AND
+   NOT ((CONFIG_IMPO_BOARD_M5STACK_CARDPUTER_ADV OR CONFIG_IMPO_BOARD_AI_PASSPORT OR CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4) AND NOT CONFIG_SPIRAM AND
         NOT CONFIG_HOMEHUB_TUNNEL AND CONFIG_LWIP_TCP_SND_BUF_DEFAULT EQUAL 5760 AND
         CONFIG_LWIP_TCP_WND_DEFAULT EQUAL 5760))
     message(FATAL_ERROR
-        "ESP32 Device SDK requires TCP send buffer and receive window 16384 (5760 on the no-tunnel Cardputer ADV and AI Passport) for DMA headroom. ${GADGET_CONFIG_REGEN_HINT}")
+        "ESP32 Device SDK requires TCP send buffer and receive window 16384 (5760 on the no-tunnel Cardputer ADV, AI Passport and X4) for DMA headroom. ${GADGET_CONFIG_REGEN_HINT}")
 endif()
 
 # A token from gadgets.impo.ai is mgst_ plus 43 canonical base64url characters.

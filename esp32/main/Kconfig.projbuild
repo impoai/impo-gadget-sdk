@@ -211,6 +211,10 @@ menu "ESP32 Device SDK"
             bool "reTerminal E1002 7.3 inch Spectra 6 colour e-paper (status screen)"
             depends on IDF_TARGET_ESP32S3 && SPIRAM
 
+        config HOMEHUB_LED_BACKEND_XTEINK_X4
+            bool "Xteink X4 SSD1677 e-paper (ESP32-C3, experimental)"
+            depends on IDF_TARGET_ESP32C3
+
         config HOMEHUB_LED_BACKEND_VOICE_RING
             bool "Home Assistant Voice PE 12-LED ring"
             depends on IDF_TARGET_ESP32S3
@@ -254,6 +258,7 @@ menu "ESP32 Device SDK"
         default y if HOMEHUB_LED_BACKEND_SENSECAP_ST7701
         default y if HOMEHUB_LED_BACKEND_RETERMINAL_UC8179
         default y if HOMEHUB_LED_BACKEND_RETERMINAL_SPECTRA6
+        default y if HOMEHUB_LED_BACKEND_XTEINK_X4
         help
             Set for backends with a display: the status bars, animation and
             agent name (a still status screen on e-paper), and the display.*
