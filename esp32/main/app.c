@@ -1708,7 +1708,12 @@ static void ws_control_task(void *arg) {
             // The keeper reconnects to the same VM (s_impo_resume_vm) and the
             // session registers afresh, name included.
             noise_ctrl_disconnect();
+#if CONFIG_IMPO_ENABLED
             s_impo_resume_vm = true;
+#else
+            // No keeper here: start the same session again ourselves.
+            noise_ctrl_reconnect(strcmp(s_ui_wifi, "down") == 0 ? NULL : s_ui_wifi);
+#endif
             break;
         case WS_CONTROL_UNPAIR:
             if (args->setup_credentials_cleared) {
