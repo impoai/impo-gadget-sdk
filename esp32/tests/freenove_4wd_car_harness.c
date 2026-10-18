@@ -31,6 +31,8 @@ static int car_hw_battery_mv(void) {
     fake_battery_reads++;
     return fake_battery_mv;
 }
+static int fake_distance_mm = -1;
+static int car_hw_distance_mm(void) { return fake_distance_mm; }
 static int64_t car_now_ms(void) { return fake_now; }
 static void car_lock(void) {}
 static void car_unlock(void) {}
@@ -207,7 +209,7 @@ static void test_validation(void) {
     CHECK(run("chassis.dance", NULL) == NULL);   // not the car's: Link answers it
     // Parts not wired yet have no commands.
     CHECK(run("chassis.set_light", "{\"effect\":\"on\"}") == NULL);
-    CHECK(run("chassis.sense", NULL) == NULL);
+    CHECK(refused("chassis.sense", "{\"pan\":90}", "takes no parameters"));
     CHECK(run("servo.set_angle", "{\"pan\":90}") == NULL);
     CHECK(run("speaker.beep", NULL) == NULL);
     CHECK(run("device.health", NULL) == NULL);
@@ -247,6 +249,17 @@ static void test_battery(void) {
     cJSON_Delete(r);
     CHECK(freenove_car_battery(&pct, &mv) && mv == 8000);
     CHECK(fake_battery_reads == reads + 3);
+}
+
+static void test_sense(void) {
+    fake_distance_mm = -1;
+    cJSON *r = run("chassis.sense", NULL);
+    CHECK(ok(r) && cJSON_IsNull(cJSON_GetObjectItem(payload(r), "distance_cm")));
+    cJSON_Delete(r);
+    fake_distance_mm = 253;
+    r = run("chassis.sense", NULL);
+    CHECK(ok(r) && fabs(cJSON_GetObjectItem(payload(r), "distance_cm")->valuedouble - 25.3) < 1e-9);
+    cJSON_Delete(r);
 }
 
 static void test_register(void) {
@@ -291,6 +304,7 @@ int main(void) {
     test_motor_driver_missing();
     test_validation();
     test_battery();
+    test_sense();
     test_register();
     if (failures) {
         fprintf(stderr, "%d check(s) failed\n", failures);

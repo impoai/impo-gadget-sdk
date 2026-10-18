@@ -6,7 +6,7 @@
  * (Tutorial.pdf, "Pins of the Car" and chapters 1 and 2, and the sketches
  * below); the code is this firmware's own.
  *
- * What this drives, the wheels and the battery reading:
+ * What this drives, the wheels, the distance sensor and the battery reading:
  * - I2C on GPIO13 (SDA) and GPIO14 (SCL) to a PCA9685 at 0x5F, run at
  *   50 Hz as Freenove does (Freenove_4WD_Car_For_ESP32.h). The motors' two
  *   inputs: M1 15/14, M2 9/8, M3 12/13, M4 10/11. M1 and M2 are the left
@@ -16,6 +16,9 @@
  * - GPIO32: the battery divider, a quarter of the voltage of the two 18650
  *   cells (8.4 V full; Tutorial.pdf 2.4 and 01.4_Battery_level,
  *   batteryCoefficient 4).
+ * - GPIO12 and GPIO15: the HC-SR04 ultrasonic trigger and echo, up to 3 m
+ *   (02.1_Ultrasonic_Ranging, Get_Sonar()). Both are strapping pins, left low.
+ *   It looks wherever servo 1 left the head; nothing turns it yet.
  * - GPIO0: the BOOT button, shared with the infrared receiver (05.1).
  *
  * Future work, for parts not wired on this car yet (no commands until they
@@ -26,8 +29,6 @@
  * - servo 1 on PCA9685 channel 0 (the ultrasonic head: 90 ahead, larger
  *   looks left, 02.2 get_distance()) and servo 2 on channel 1 (the camera
  *   head, kept at 80 to 180 by 06.3 Servo_2_Angle());
- * - the HC-SR04 ultrasonic sensor, trigger GPIO12 and echo GPIO15, both
- *   strapping pins (02.1 Get_Sonar());
  * - the line-tracking sensors, a PCF8574 at 0x20, bits 0 to 2 left, middle,
  *   right (04.1 Track_Car());
  * - the photoresistors on GPIO33 (03.1, 03.2 Light_Car());
@@ -47,6 +48,7 @@
 #include <string.h>
 
 #include "command_params.h"
+#include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "driver/uart.h"
 #include "esp_adc/adc_cali.h"
@@ -78,6 +80,7 @@ static const char *TAG = "link.car";
 // Hardware, defined under "---- Hardware" (or by the host harness).
 static bool car_hw_motors(const int duty[4]);   // M1..M4, -4095..4095
 static int car_hw_battery_mv(void);   // read now; -1 if the ADC did not answer
+static int car_hw_distance_mm(void);  // -1 without an echo within 3 m
 static int64_t car_now_ms(void);
 static void car_lock(void);     // no-ops until freenove_car_init()
 static void car_unlock(void);
@@ -240,6 +243,18 @@ static cJSON *cmd_status(const cJSON *params) {
     return car_ok(payload);
 }
 
+static cJSON *cmd_sense(const cJSON *params) {
+    (void)params;
+    cJSON *payload = cJSON_CreateObject();
+    int mm = car_hw_distance_mm();
+    if (mm < 0) {
+        cJSON_AddNullToObject(payload, "distance_cm");
+    } else {
+        cJSON_AddNumberToObject(payload, "distance_cm", mm / 10.0);
+    }
+    return car_ok(payload);
+}
+
 typedef struct {
     const char *name;
     const char *description;
@@ -272,6 +287,10 @@ static const car_command_t s_commands[] = {
       "Whether the car's motor driver answers, whether it is moving (and for how much longer), why "
       "it last stopped, and the battery voltage.",
       NULL, NULL, cmd_status },
+    { "chassis.sense",
+      "Measure the distance in cm to what is in front of the car's ultrasonic head (null with no "
+      "echo within 3 m).",
+      NULL, NULL, cmd_sense },
 };
 
 void freenove_car_describe(cJSON *commands) {
@@ -342,6 +361,9 @@ bool freenove_car_battery(int *percent, int *millivolts) {
 #define PCA9685_ADDR 0x5F
 #define BATTERY_ADC ADC_CHANNEL_4       // GPIO32
 #define BATTERY_DIVIDER 4
+#define SONIC_TRIG GPIO_NUM_12
+#define SONIC_ECHO GPIO_NUM_15
+#define SONIC_MAX_US 18000              // 3 m there and back
 #define CONSOLE_UART UART_NUM_0
 
 // PCA9685 registers.
@@ -435,6 +457,22 @@ static int car_hw_battery_mv(void) {
     return n ? sum / n * BATTERY_DIVIDER : -1;
 }
 
+// A trigger pulse, then the echo's length: under 25 ms of busy waiting.
+static int car_hw_distance_mm(void) {
+    gpio_set_level(SONIC_TRIG, 1);
+    esp_rom_delay_us(10);
+    gpio_set_level(SONIC_TRIG, 0);
+    int64_t sent = esp_timer_get_time();
+    while (!gpio_get_level(SONIC_ECHO)) {
+        if (esp_timer_get_time() - sent > 6000) return -1;
+    }
+    int64_t start = esp_timer_get_time();
+    while (gpio_get_level(SONIC_ECHO)) {
+        if (esp_timer_get_time() - start > SONIC_MAX_US) return -1;
+    }
+    return (int)((esp_timer_get_time() - start) * 343 / 2000);   // 343 m/s, there and back
+}
+
 static void car_task(void *arg) {
     (void)arg;
     for (;;) {
@@ -507,6 +545,13 @@ bool freenove_car_init(void) {
     ESP_LOGI(TAG, "PCA9685 at 0x%02X: %s", PCA9685_ADDR,
              s_car.base_ok ? "ready, motors stopped" : "not answering");
     esp_register_shutdown_handler(car_shutdown);
+
+    gpio_config_t trig = { .pin_bit_mask = 1ULL << SONIC_TRIG, .mode = GPIO_MODE_OUTPUT };
+    gpio_config(&trig);
+    gpio_set_level(SONIC_TRIG, 0);
+    gpio_config_t echo = { .pin_bit_mask = 1ULL << SONIC_ECHO, .mode = GPIO_MODE_INPUT,
+                           .pull_down_en = GPIO_PULLDOWN_ENABLE };
+    gpio_config(&echo);
 
     adc_oneshot_unit_init_cfg_t unit = { .unit_id = ADC_UNIT_1 };
     adc_oneshot_chan_cfg_t chan = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_DEFAULT };
