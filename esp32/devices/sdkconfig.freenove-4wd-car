@@ -18,7 +18,7 @@ CONFIG_HOMEHUB_BLE_NAME_SUFFIX="-Car"
 CONFIG_HOMEHUB_BUTTON_GPIO=0
 # The product its owner created on the Impo developer platform: the agent
 # gets that product's manifest when the car is paired to the owner's account.
-CONFIG_GADGET_PRODUCT_ID="freenove-4wd-car"
+CONFIG_GADGET_PRODUCT_ID="e83921d6-c6fe-4d82-a4f6-ec02ddb37798"
 
 # Signed apps without Secure Boot use the Secure Boot V2 (RSA) scheme, which
 # the ESP32 supports from chip revision 3.0 (ESP32-D0WD-V3).
