@@ -109,8 +109,8 @@ upside-down → wiggle) are not carried over as reflexes: the board reports the
 event and the agent decides, guided by `instructions` (once they reach the
 agent through the product manifest).
 
-`product_id` is `arcs-robot-dog`, the dog's product on the Impo developer
-platform; it registers as a custom gadget of that product.
+`product_id` is `b4066283-da1a-4c2f-922a-bfa1ad4804e9`, the ID of the dog's
+product (named arcs-robot-dog) on the Impo developer platform; it registers as a custom gadget of that product.
 
 ## 4. Layout
 
