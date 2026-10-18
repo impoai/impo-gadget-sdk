@@ -244,7 +244,7 @@ Settled, so that nothing below has to be argued twice.
    over the session's handshake hash) or, from a custom gadget, a
    `product_id` that binds only when the product's owner is the account the
    gadget is paired to. Its execution contract is the commands it runs
-   (`commands_v2`: names and parameters). Everything said to the agent about
+   (`commands_v2`: their names only). Everything said to the agent about
    it lives on the Impo platform as the product's structured manifest: a
    system prompt, the commands the agent may use with a description and a
    parameter schema each, and the events with their meanings. Makers fill

@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "cJSON.h"
-#include "command_params.h"
 
 static int64_t fake_now;
 static int fake_duty[4];
@@ -198,18 +197,18 @@ static void test_motor_driver_missing(void) {
 }
 
 static void test_validation(void) {
-    CHECK(refused("chassis.drive", "{\"forward\":1.5}", "\"forward\" must be a number from -1 to 1"));
-    CHECK(refused("chassis.drive", "{\"turn\":-2}", "\"turn\""));
-    CHECK(refused("chassis.drive", "{\"forward\":\"fast\"}", "\"forward\""));
-    CHECK(refused("chassis.drive", "{\"duration_ms\":0}", "from 1 to 10000"));
-    CHECK(refused("chassis.drive", "{\"duration_ms\":10001}", "from 1 to 10000"));
-    CHECK(refused("chassis.drive", "{\"duration_ms\":250.5}", "an integer"));
-    CHECK(refused("chassis.drive", "{\"speed\":1}", "unknown parameter \"speed\""));
-    CHECK(refused("chassis.move", NULL, "missing parameter: \"direction\""));
-    CHECK(refused("chassis.move", "{\"direction\":\"up\"}", "one of \"forward\""));
-    CHECK(refused("chassis.move", "{\"direction\":\"forward\",\"speed\":0}", "from 0.1 to 1"));
-    CHECK(refused("chassis.stop", "{\"now\":true}", "takes no parameters"));
-    CHECK(refused("chassis.status", "{\"verbose\":true}", "takes no parameters"));
+    // The platform checks calls against the manifest; these checks keep the car
+    // safe whatever arrives.
+    CHECK(refused("chassis.drive", "{\"forward\":1.5}", "forward and turn must be -1 to 1"));
+    CHECK(refused("chassis.drive", "{\"turn\":-2}", "turn"));
+    CHECK(refused("chassis.drive", "{\"forward\":\"fast\"}", "forward"));
+    CHECK(refused("chassis.drive", "{\"duration_ms\":0}", "1 to 10000"));
+    CHECK(refused("chassis.drive", "{\"duration_ms\":10001}", "1 to 10000"));
+    CHECK(refused("chassis.drive", "{\"duration_ms\":250.5}", "whole number"));
+    CHECK(refused("chassis.move", NULL, "direction must be"));
+    CHECK(refused("chassis.move", "{\"direction\":\"up\"}", "direction must be"));
+    CHECK(refused("chassis.move", "{\"direction\":\"forward\",\"speed\":0}", "0.1 to 1"));
+    CHECK(refused("chassis.move", "{\"direction\":\"forward\",\"duration_ms\":20000}", "1 to 10000"));
     cJSON *list = cJSON_CreateArray();
     cJSON *r = freenove_car_command("chassis.drive", list);
     CHECK(!ok(r) && strstr(message(r), "must be an object"));
@@ -218,9 +217,9 @@ static void test_validation(void) {
     CHECK(run("chassis.dance", NULL) == NULL);   // not the car's: Link answers it
     // Parts not wired yet have no commands.
     CHECK(run("chassis.set_light", "{\"effect\":\"on\"}") == NULL);
-    CHECK(refused("chassis.sense", "{\"pan\":90}", "takes no parameters"));
     CHECK(refused("servo.set_angle", "{\"tilt\":40}", "tilt"));
     CHECK(refused("servo.set_angle", "{\"pan\":181}", "pan"));
+    CHECK(refused("servo.set_angle", "{\"pan\":\"left\"}", "pan"));
     CHECK(run("speaker.beep", NULL) == NULL);
     CHECK(run("device.health", NULL) == NULL);
     CHECK(!s_car.moving);                        // no refused call moved it
@@ -297,23 +296,9 @@ static void test_register(void) {
     cJSON *c;
     cJSON_ArrayForEach(c, commands) {
         n++;
-        CHECK(cJSON_IsString(cJSON_GetObjectItem(c, "description")));
-        CHECK(cJSON_IsObject(cJSON_GetObjectItem(c, "required")));
-        CHECK(cJSON_IsObject(cJSON_GetObjectItem(c, "optional")));
-        cJSON *p;
-        cJSON_ArrayForEach(p, cJSON_GetObjectItem(c, "optional")) {
-            CHECK(cJSON_IsString(cJSON_GetObjectItem(p, "type")));
-            CHECK(cJSON_IsString(cJSON_GetObjectItem(p, "description")));
-        }
+        CHECK(cJSON_IsObject(c) && cJSON_GetArraySize(c) == 0);   // the name only
     }
     CHECK(n == (int)(sizeof(s_commands) / sizeof(s_commands[0])));
-    // Every table entry parsed (a typo would leave an empty object).
-    for (size_t i = 0; i < sizeof(s_commands) / sizeof(s_commands[0]); i++) {
-        if (s_commands[i].optional) {
-            cJSON *opt = cJSON_GetObjectItem(cJSON_GetObjectItem(commands, s_commands[i].name), "optional");
-            CHECK(cJSON_GetArraySize(opt) > 0);
-        }
-    }
     cJSON *params = cJSON_CreateObject();
     freenove_car_capabilities(params);
     cJSON_AddItemToObject(params, "commands_v2", commands);

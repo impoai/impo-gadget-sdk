@@ -24,23 +24,21 @@ extern "C" {
 
 /*
  * Commands a gadget with the full UI offers its account, beyond what Home Link
- * registers itself. Each is declared in link.register with a description the
- * agent reads, and runs when a link.invoke names it.
+ * registers itself. link.register names each one; what it does and its
+ * parameters are described in the product's manifest on the Impo platform
+ * (contracts/gadget-identity.md in impoai/impo). It runs when a link.invoke
+ * names it.
  *
- * A board adds its own with impo_board_t.commands. `required` and `optional`
- * are JSON objects of parameter name to {"type", "description"}, or NULL.
- * `run` returns a result object it owns no longer: {"ok":true,...} or
+ * A board adds its own with impo_board_t.commands. `run` checks its own
+ * parameters and returns a result object it owns no longer: {"ok":true,...} or
  * impo_command_error(). It runs on the Link session task, so it must not block.
  */
 typedef struct {
     const char *name;
-    const char *description;
-    const char *required;
-    const char *optional;
     cJSON *(*run)(const cJSON *params);
 } impo_command_t;
 
-/* Adds every command of this gadget to the link.register "commands_v2" object. */
+/* Names every command of this gadget in the link.register "commands_v2" object. */
 void impo_commands_describe(cJSON *commands);
 
 /* Adds the link.register "capabilities" object (what this gadget has, as

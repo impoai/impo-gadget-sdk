@@ -760,36 +760,13 @@ bool impo_sparkbot_console(const char *line, bool whole)
 }
 
 static const impo_command_t s_commands[] = {
-    { "chassis.drive",
-      "Drive the SparkBot's tracked base, if it is sitting on one, for a while: forward speed and "
-      "turn, each -1 to 1 (turn with forward 0 spins in place). It stops by itself when the time "
-      "is up. The result says whether the base answered.",
-      NULL,
-      "{\"forward\":{\"type\":\"number\",\"description\":\"-1 (full speed back) to 1 (full speed forward); 0 if left out.\"},"
-      "\"turn\":{\"type\":\"number\",\"description\":\"-1 (left) to 1 (right); 0 if left out.\"},"
-      "\"duration_ms\":{\"type\":\"integer\",\"description\":\"How long, up to 10000; 500 if left out.\"}}",
-      chassis_drive },
-    { "chassis.move",
-      "Move the SparkBot's tracked base, if it is sitting on one, in one direction for a while "
-      "(half a second if no duration), or stop it.",
-      "{\"direction\":{\"type\":\"string\",\"description\":\"forward, back, left, right or stop.\"}}",
-      "{\"duration_ms\":{\"type\":\"integer\",\"description\":\"How long, up to 10000; 500 if left out.\"}}",
-      chassis_move },
-    { "chassis.stop", "Stop the SparkBot's tracked base at once.", NULL, NULL, chassis_stop },
-    { "chassis.dance", "Make the SparkBot's tracked base do its own little dance, a few seconds long.",
-      NULL, NULL, chassis_dance },
-    { "chassis.set_light",
-      "Choose the effect on the tracked base's RGB lights.",
-      "{\"effect\":{\"type\":\"string\",\"description\":\"on, blink, breathe_slow, breathe_fast, flowing, show or off.\"}}",
-      NULL, chassis_light },
-    { "chassis.status",
-      "Whether a tracked base is answering the SparkBot and whether it is moving.",
-      NULL, NULL, chassis_status },
-    { "imu.read",
-      "Read the SparkBot's motion sensor: which way up it is (upright, upside_down, face_up, "
-      "face_down, on_left_side, on_right_side or tilted), whether it is being moved, and the raw "
-      "acceleration in g and rotation in degrees per second.",
-      NULL, NULL, imu_read },
+    { "chassis.drive",     chassis_drive },
+    { "chassis.move",      chassis_move },
+    { "chassis.stop",      chassis_stop },
+    { "chassis.dance",     chassis_dance },
+    { "chassis.set_light", chassis_light },
+    { "chassis.status",    chassis_status },
+    { "imu.read",          imu_read },
 };
 
 static const impo_board_t s_board = {

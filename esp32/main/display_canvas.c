@@ -47,47 +47,15 @@ cJSON *display_canvas_info(void) {
     return r;
 }
 
-static void param(cJSON *o, const char *name, const char *type, const char *description) {
-    cJSON *p = cJSON_AddObjectToObject(o, name);
-    cJSON_AddStringToObject(p, "type", type);
-    cJSON_AddStringToObject(p, "description", description);
-}
-static cJSON *describe(cJSON *commands, const char *name, const char *desc) {
-    cJSON *c = cJSON_AddObjectToObject(commands, name);
-    cJSON_AddStringToObject(c, "description", desc);
-    cJSON_AddObjectToObject(c, "required");
-    return cJSON_AddObjectToObject(c, "optional");
-}
+// The names only: the product's manifest describes them to the agent.
 void display_canvas_describe(cJSON *commands) {
-    describe(commands, "display.get_info", "Get canvas size, colors, text/image formats and busy state.");
-    const char *names[] = {"display.clear", "display.draw_text"};
-    const char *descs[] = {
-        "Fill a rectangle, preserving everything outside it. Defaults to the whole canvas, white. Buffered until display.refresh.",
-        "Draw text in a rectangle, preserving pixels outside it. ASCII only; wrap at width and clip at height. Render Unicode/formulas as an image. Buffered until display.refresh.",
+    static const char *const names[] = {
+        "display.get_info", "display.clear", "display.draw_text", "display.refresh",
+        "display.set_power_off_image",
     };
-    for (int i = 0; i < 2; i++) {
-        cJSON *o = describe(commands, names[i], descs[i]);
-        param(o, "x", "integer", "Left pixel; default 0.");
-        param(o, "y", "integer", "Top pixel; default 0.");
-        param(o, "width", "integer", "Rectangle width; default remaining screen width.");
-        param(o, "height", "integer", "Rectangle height; default remaining screen height.");
-        param(o, "color", "string", i ? "black (default) or white." : "white (default) or black.");
-        param(o, "refresh", "boolean", "Queue one full refresh after drawing; default false.");
-        if (i) {
-            param(cJSON_GetObjectItem(cJSON_GetObjectItem(commands, names[i]), "required"),
-                  "text", "string", "1..512 ASCII characters; newline allowed.");
-            param(o, "scale", "integer", "Font scale 1..8; default 3 (18x24 pixel cell).");
-            param(o, "background", "string", "transparent (default), white or black; fills this rectangle.");
-        }
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+        cJSON_AddObjectToObject(commands, names[i]);
     }
-    describe(commands, "display.refresh", "Queue the buffered canvas for a full refresh. Returns queued:true; poll display.get_info busy until false. Retry busy responses after the current image/refresh ends.");
-    cJSON *off = describe(commands, "display.set_power_off_image",
-        "Save the current complete canvas as the power-off image, including images and text. "
-        "First draw the desired page, await successful drawing/refresh and busy:false, then call with {}. "
-        "This command takes NO URL and does NOT shut down. Returns stored:true only after flash write/readback. "
-        "The saved page survives reboot, works offline and is independent of later drawings. "
-        "Use reset:true to restore the default goodbye page; that returns stored:false.");
-    param(off, "reset", "boolean", "Default false: save current canvas. True: remove custom power-off image.");
 }
 
 static bool integer(const cJSON *p, const char *key, int fallback, int lo, int hi, int *out) {

@@ -1,7 +1,7 @@
 # Agent-controlled canvas
 
-The firmware declares `capabilities.screen` and five drawing commands in
-`commands_v2`. An agent discovers them with `impo_list_gadgets` and invokes them
+The firmware declares `capabilities.screen` and names five drawing commands in
+`commands_v2`; the X4 product's manifest describes them as below. An agent discovers them with `impo_list_gadgets` and invokes them
 through `impo_gadget_command`. Nothing in firmware decides the page layout.
 `main/display_canvas.c` owns geometry, text and command validation. X4 supplies
 the pixel writer, framebuffer lock and e-paper refresh through a backend.

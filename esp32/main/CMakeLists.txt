@@ -38,7 +38,6 @@ set(GADGET_SRCS
     "pairing_transcript.c"
     "factory_test.c"
     "gadget_attest.c"
-    "command_params.c"
 )
 
 set(GADGET_REQUIRES

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 """Builds the Impo product manifest (contracts/gadget-identity.md, ManifestInput)
-for the Freenove 4WD car from the firmware's own command table
-(main/freenove_4wd_car.c), so the platform describes exactly what the firmware
-registers and checks.
+for the Freenove 4WD car. The firmware registers only command names; everything
+the agent reads about them is here, and the platform checks calls against these
+schemas. Refuses to build when the car's commands differ from what
+main/freenove_4wd_car.c registers.
 
 usage: tools/freenove_4wd_car_manifest.py [--min-firmware 0.1.0] > manifest.json
 """
@@ -15,7 +16,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "main/freenove_4wd_car.c"
-TOKEN = re.compile(r'"((?:[^"\\]|\\.)*)"|([{}(),;])|([A-Za-z_][A-Za-z0-9_]*)|(/\*.*?\*/|//[^\n]*)|(\s+)|(.)', re.S)
 
 SYSTEM_PROMPT = """\
 You control a Freenove 4WD Car: a small four-wheeled robot car with an ESP32 on top and two \
@@ -47,45 +47,13 @@ Be playful but careful: say what you did in one short sentence, and ask before l
 fast moves."""
 
 
-def c_string(body):
-    return json.loads('"' + body.replace("\\'", "'") + '"')
-
-
-def table(path, name):
-    """The rows of `name[] = { {...}, ... };`: strings joined (macros expanded), NULL as None."""
+def registered(path, name):
+    """The command names in the firmware's `name[] = { {"a.b", run}, ... };`."""
     src = path.read_text()
-    macros = {m.group(1): m.group(2) for m in re.finditer(r'#define (\w+) ((?:"(?:[^"\\]|\\.)*"\s*\\?\s*)+)', src)}
-    m = re.search(re.escape(name) + r'\[\]\s*=\s*\{', src)
+    m = re.search(re.escape(name) + r'\[\]\s*=\s*\{(.*?)\n\};', src, re.S)
     if not m:
         sys.exit(f"{name} not found in {path}")
-    rows, row, field, depth = [], None, None, 1
-    for t in TOKEN.finditer(src, m.end()):
-        s, p, ident, comment, space, other = t.groups()
-        if comment or space:
-            continue
-        if p == '{':
-            depth += 1
-            row, field = [], None
-        elif p == '}':
-            depth -= 1
-            if depth == 0:
-                return rows
-            if row is not None:
-                if field is not None:
-                    row.append(field)
-                rows.append(row)
-                row, field = None, None
-        elif p == ',' and row is not None:
-            row.append(field)
-            field = None
-        elif s is not None and row is not None:
-            field = (field or '') + c_string(s)
-        elif ident is not None and row is not None:
-            if ident in macros:
-                field = (field or '') + ''.join(c_string(x) for x in re.findall(r'"((?:[^"\\]|\\.)*)"', macros[ident]))
-            else:
-                field = None if ident == 'NULL' else ('@' + ident)
-    sys.exit(f"{name}: unterminated table")
+    return re.findall(r'\{\s*"([^"]+)"', m.group(1))
 
 
 def command(name, desc, req, opt):
@@ -98,6 +66,41 @@ def command(name, desc, req, opt):
     assert re.fullmatch(r'[a-z][a-z0-9_]*(\.[a-z0-9_]+){0,3}', name), name
     assert 1 <= len(desc) <= 500, (name, len(desc))
     return {"name": name, "description": desc, "parameters": schema}
+
+
+# The car's own commands (main/freenove_4wd_car.c runs them; it registers only
+# their names, so what the agent reads about them is here).
+CAR = [
+    ("chassis.drive",
+     "Drive the 4WD car for a while: forward speed and turn, each -1 to 1 (turn alone spins it in "
+     "place). It stops by itself when the time is up. Returns at once.",
+     None,
+     '{"forward":{"type":"number","minimum":-1,"maximum":1,"description":"-1 (full speed back) to 1 (full speed forward); 0 if left out."},"turn":{"type":"number","minimum":-1,"maximum":1,"description":"-1 (left) to 1 (right); 0 if left out."},"duration_ms":{"type":"integer","minimum":1,"maximum":10000,"description":"How long, 1 to 10000; 500 if left out."}}'),
+    ("chassis.move",
+     "Drive the 4WD car in one direction for a while (left and right spin it in place), or stop it. "
+     "Returns at once.",
+     '{"direction":{"type":"string","enum":["forward","back","left","right","stop"],"description":"forward, back, left, right or stop."}}',
+     '{"duration_ms":{"type":"integer","minimum":1,"maximum":10000,"description":"How long, 1 to 10000; 500 if left out."},"speed":{"type":"number","minimum":0.1,"maximum":1,"description":"0.1 to 1; 0.5 if left out."}}'),
+    ("chassis.stop",
+     "Stop the 4WD car's wheels at once.",
+     None,
+     None),
+    ("chassis.status",
+     "Whether the car's motor driver answers, whether it is moving (and for how much longer), why it "
+     "last stopped, and the battery voltage.",
+     None,
+     None),
+    ("chassis.sense",
+     "Measure the distance in cm to what is in front of the car's ultrasonic head (null with no echo "
+     "within 3 m).",
+     None,
+     None),
+    ("servo.set_angle",
+     "Turn the car's head, which carries the camera and the distance sensor: pan turns it left and "
+     "right, tilt up and down. Give one or both. The servos need the battery switched on.",
+     None,
+     '{"pan":{"type":"integer","minimum":0,"maximum":180,"description":"0 (right) to 180 (left); 90 ahead."},"tilt":{"type":"integer","minimum":80,"maximum":180,"description":"80 to 180; 90 at start."}}'),
+]
 
 
 # Link's own commands (main/noise_control.cpp), which every ESP32 gadget registers.
@@ -120,8 +123,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--min-firmware", default="0.1.0")
     a = ap.parse_args()
-    rows = table(SOURCE, "s_commands")
-    commands = [command(r[0], r[1], r[2], r[3]) for r in rows] + [command(*c) for c in LINK]
+    ours = [c[0] for c in CAR]
+    if ours != registered(SOURCE, "s_commands"):
+        sys.exit(f"CAR {ours} differs from what {SOURCE.name} registers")
+    commands = [command(*c) for c in CAR + LINK]
     names = [c["name"] for c in commands]
     assert len(names) == len(set(names)) and len(commands) <= 64
     assert len(SYSTEM_PROMPT) <= 4000, len(SYSTEM_PROMPT)

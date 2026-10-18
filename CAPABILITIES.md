@@ -43,12 +43,13 @@ developer platform, not the firmware. The contract is
 
 `link.register` carries:
 
-- `commands_v2`: every command the gadget runs, each with a description and
-  `required` / `optional` parameters (`{"type", "description"}` each). The
-  gateway checks a bound gadget's manifest against these names: a manifest
-  command the firmware does not register makes the gadget not set up. A
-  gadget that is not set up is offered these commands as they are. A result
-  is `{"ok": true, "payload": {...}}` or `{"ok": false, "error": "..."}`.
+- `commands_v2`: every command the gadget runs, by name only: `{"<name>": {}}`,
+  plus `timeout_ms` on a command that can take longer than 30 seconds. Its
+  description and parameter schema are in the manifest. The gateway checks a
+  bound gadget's manifest against these names: a manifest command the
+  firmware does not register makes the gadget not set up. A gadget that is
+  not set up is offered only these names. A result is
+  `{"ok": true, "payload": {...}}` or `{"ok": false, "error": "..."}`.
 - Who it is: an official unit's `unit_id` and `attest` (below), or a custom
   gadget's `product_id` (below), or neither.
 - `capabilities`: a summary for apps and prompts, without listing commands:

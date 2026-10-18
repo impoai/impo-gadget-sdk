@@ -56,7 +56,6 @@
 
 #include "camera.h"
 #include "camera_dvp.h"
-#include "command_params.h"
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "driver/uart.h"
@@ -122,9 +121,23 @@ static cJSON *car_ok(cJSON *payload) {
     return result;
 }
 
-static double car_number(const cJSON *params, const char *key, double fallback) {
+// The firmware registers only command names; the product's manifest tells the
+// agent the ranges, and these checks keep the car safe whatever arrives.
+// fallback when key is left out; false when it is not a number in lo..hi
+// (a whole one, when whole).
+static bool car_param(const cJSON *params, const char *key, double fallback, double lo, double hi,
+                      bool whole, double *out) {
     const cJSON *v = cJSON_GetObjectItem(params, key);
-    return cJSON_IsNumber(v) ? v->valuedouble : fallback;
+    if (!v) {
+        *out = fallback;
+        return true;
+    }
+    if (!cJSON_IsNumber(v) || v->valuedouble < lo || v->valuedouble > hi ||
+        (whole && v->valuedouble != (double)v->valueint)) {
+        return false;
+    }
+    *out = v->valuedouble;
+    return true;
 }
 
 // The signed duty for a wheel speed of -1..1: off, or at least the stall duty.
@@ -216,21 +229,37 @@ static cJSON *car_drive(double forward, double turn, int ms) {
     return car_ok(payload);
 }
 
+static bool car_duration(const cJSON *params, double *ms) {
+    return car_param(params, "duration_ms", CAR_DEFAULT_MS, 1, CAR_MAX_MS, true, ms);
+}
+
 static cJSON *cmd_drive(const cJSON *params) {
-    return car_drive(car_number(params, "forward", 0), car_number(params, "turn", 0),
-                     (int)car_number(params, "duration_ms", CAR_DEFAULT_MS));
+    double forward, turn, ms;
+    if (!car_param(params, "forward", 0, -1, 1, false, &forward) ||
+        !car_param(params, "turn", 0, -1, 1, false, &turn)) {
+        return car_error("invalid_param", "forward and turn must be -1 to 1");
+    }
+    if (!car_duration(params, &ms)) {
+        return car_error("invalid_param", "duration_ms must be a whole number, 1 to 10000");
+    }
+    return car_drive(forward, turn, (int)ms);
 }
 
 static cJSON *cmd_move(const cJSON *params) {
     const char *direction = cJSON_GetStringValue(cJSON_GetObjectItem(params, "direction"));
-    double speed = car_number(params, "speed", CAR_DEFAULT_SPEED);
-    int ms = (int)car_number(params, "duration_ms", CAR_DEFAULT_MS);
+    double speed, ms;
+    if (!car_param(params, "speed", CAR_DEFAULT_SPEED, 0.1, 1, false, &speed)) {
+        return car_error("invalid_param", "speed must be 0.1 to 1");
+    }
+    if (!car_duration(params, &ms)) {
+        return car_error("invalid_param", "duration_ms must be a whole number, 1 to 10000");
+    }
     static const struct { const char *name; int forward, turn; } moves[] = {
         {"forward", 1, 0}, {"back", -1, 0}, {"left", 0, -1}, {"right", 0, 1}, {"stop", 0, 0},
     };
-    for (size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
+    for (size_t i = 0; direction && i < sizeof(moves) / sizeof(moves[0]); i++) {
         if (!strcmp(direction, moves[i].name)) {
-            return car_drive(moves[i].forward * speed, moves[i].turn * speed, ms);
+            return car_drive(moves[i].forward * speed, moves[i].turn * speed, (int)ms);
         }
     }
     return car_error("invalid_param", "direction must be forward, back, left, right or stop");
@@ -261,14 +290,18 @@ static int car_servo_us(int angle) {
 }
 
 static cJSON *cmd_servo(const cJSON *params) {
-    const cJSON *pan = cJSON_GetObjectItem(params, "pan");
-    const cJSON *tilt = cJSON_GetObjectItem(params, "tilt");
-    if (!pan && !tilt) return car_error("invalid_param", "give pan, tilt or both");
+    // Below a tilt of 80 the head runs into the car (Freenove's Servo_2_Angle()).
+    double pan, tilt;
+    if (!car_param(params, "pan", -1, 0, 180, true, &pan) ||
+        !car_param(params, "tilt", -1, 80, 180, true, &tilt)) {
+        return car_error("invalid_param", "pan must be a whole number 0 to 180, tilt 80 to 180");
+    }
+    if (pan < 0 && tilt < 0) return car_error("invalid_param", "give pan, tilt or both");
     bool ok = true;
     cJSON *payload = cJSON_CreateObject();
     car_lock();
-    if (pan && (ok = car_hw_servo(0, car_servo_us(pan->valueint)))) s_car.pan = pan->valueint;
-    if (ok && tilt && (ok = car_hw_servo(1, car_servo_us(tilt->valueint)))) s_car.tilt = tilt->valueint;
+    if (pan >= 0 && (ok = car_hw_servo(0, car_servo_us((int)pan)))) s_car.pan = (int)pan;
+    if (ok && tilt >= 0 && (ok = car_hw_servo(1, car_servo_us((int)tilt)))) s_car.tilt = (int)tilt;
     cJSON_AddNumberToObject(payload, "pan", s_car.pan);
     cJSON_AddNumberToObject(payload, "tilt", s_car.tilt);
     car_unlock();
@@ -293,58 +326,23 @@ static cJSON *cmd_sense(const cJSON *params) {
 
 typedef struct {
     const char *name;
-    const char *description;
-    const char *required;   // JSON Schema properties, as in link.register
-    const char *optional;
     cJSON *(*run)(const cJSON *params);
 } car_command_t;
 
-#define DURATION_MS "\"duration_ms\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":10000," \
-                    "\"description\":\"How long, 1 to 10000; 500 if left out.\"}"
-
+// What the agent reads about these is in the product's manifest
+// (tools/freenove_4wd_car_manifest.py).
 static const car_command_t s_commands[] = {
-    { "chassis.drive",
-      "Drive the 4WD car for a while: forward speed and turn, each -1 to 1 (turn alone spins it in "
-      "place). It stops by itself when the time is up. Returns at once.",
-      NULL,
-      "{\"forward\":{\"type\":\"number\",\"minimum\":-1,\"maximum\":1,\"description\":\"-1 (full speed back) to 1 (full speed forward); 0 if left out.\"},"
-      "\"turn\":{\"type\":\"number\",\"minimum\":-1,\"maximum\":1,\"description\":\"-1 (left) to 1 (right); 0 if left out.\"},"
-      DURATION_MS "}",
-      cmd_drive },
-    { "chassis.move",
-      "Drive the 4WD car in one direction for a while (left and right spin it in place), or stop it. "
-      "Returns at once.",
-      "{\"direction\":{\"type\":\"string\",\"enum\":[\"forward\",\"back\",\"left\",\"right\",\"stop\"],\"description\":\"forward, back, left, right or stop.\"}}",
-      "{" DURATION_MS ","
-      "\"speed\":{\"type\":\"number\",\"minimum\":0.1,\"maximum\":1,\"description\":\"0.1 to 1; 0.5 if left out.\"}}",
-      cmd_move },
-    { "chassis.stop", "Stop the 4WD car's wheels at once.", NULL, NULL, cmd_stop },
-    { "chassis.status",
-      "Whether the car's motor driver answers, whether it is moving (and for how much longer), why "
-      "it last stopped, and the battery voltage.",
-      NULL, NULL, cmd_status },
-    { "chassis.sense",
-      "Measure the distance in cm to what is in front of the car's ultrasonic head (null with no "
-      "echo within 3 m).",
-      NULL, NULL, cmd_sense },
-    { "servo.set_angle",
-      "Turn the car's head, which carries the camera and the distance sensor: pan turns it left and "
-      "right, tilt up and down. Give one or both. The servos need the battery switched on.",
-      NULL,
-      "{\"pan\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":180,\"description\":\"0 (right) to 180 (left); 90 ahead.\"},"
-      "\"tilt\":{\"type\":\"integer\",\"minimum\":80,\"maximum\":180,\"description\":\"80 to 180; 90 at start.\"}}",
-      cmd_servo },
+    { "chassis.drive",   cmd_drive },
+    { "chassis.move",    cmd_move },
+    { "chassis.stop",    cmd_stop },
+    { "chassis.status",  cmd_status },
+    { "chassis.sense",   cmd_sense },
+    { "servo.set_angle", cmd_servo },
 };
 
 void freenove_car_describe(cJSON *commands) {
     for (size_t i = 0; i < sizeof(s_commands) / sizeof(s_commands[0]); i++) {
-        const car_command_t *c = &s_commands[i];
-        cJSON *spec = cJSON_AddObjectToObject(commands, c->name);
-        cJSON_AddStringToObject(spec, "description", c->description);
-        cJSON *req = c->required ? cJSON_Parse(c->required) : NULL;
-        cJSON *opt = c->optional ? cJSON_Parse(c->optional) : NULL;
-        cJSON_AddItemToObject(spec, "required", req ? req : cJSON_CreateObject());
-        cJSON_AddItemToObject(spec, "optional", opt ? opt : cJSON_CreateObject());
+        cJSON_AddObjectToObject(commands, s_commands[i].name);
     }
 }
 
@@ -366,10 +364,6 @@ cJSON *freenove_car_command(const char *command, const cJSON *params) {
         return car_error("invalid_param", "params must be an object");
     }
     if (cJSON_IsNull(params)) params = NULL;
-    char why[400];
-    if (!command_params_check(c->required, c->optional, params, why, sizeof(why))) {
-        return car_error("invalid_param", why);
-    }
     return c->run(params);
 }
 

@@ -256,49 +256,19 @@ static cJSON *speaker_status(const cJSON *params)
 }
 
 static const impo_command_t COMMON[] = {
-    { "display.show_text",
-      "Show a short line of text on the gadget's screen, under the avatar, until the next thing it "
-      "shows. UTF-8; Chinese and Japanese show on gadgets built with the CJK font, as boxes on "
-      "others. Wakes the screen.",
-      "{\"text\":{\"type\":\"string\",\"description\":\"The text, up to 200 bytes (about 60 Chinese characters).\"}}", NULL, show_text },
-    { "avatar.cheer",
-      "Make the on-screen avatar hop happily for about two seconds, as it does when petted. Wakes the screen.",
-      NULL, NULL, avatar_cheer },
-    { "speaker.set_volume",
-      "Set the gadget's speaker volume and remember it.",
-      "{\"percent\":{\"type\":\"integer\",\"description\":\"0 (silent) to 100.\"}}", NULL, set_volume },
-    { "speaker.beep",
-      "Play one short chirp on the gadget's speaker, to get attention or to check the speaker works.",
-      NULL, NULL, beep },
-    { "speaker.play_url",
-      "Play a sound on the gadget's speaker from a public https URL that points straight at an MP3 "
-      "file (music, a sound effect, speech), up to about a minute of it. The gadget fetches the file "
-      "itself with no login and no browser, so a web page, a streaming service or a player link won't "
-      "do: the response must be the audio bytes. Returns at once; the sound starts within a couple of "
-      "seconds, and speaker.status says whether it played or why not.",
-      "{\"url\":{\"type\":\"string\",\"description\":\"https URL of an MP3 file, up to 1.5 MB.\"}}",
-      NULL, play_url },
-    { "speaker.say",
-      "Say something out loud on the gadget's speaker, in Impo's voice: a sentence or two for the "
-      "person next to it. Returns at once; the speech starts a few seconds later.",
-      "{\"text\":{\"type\":\"string\",\"description\":\"What to say, 1 to 1000 characters, any language.\"}}",
-      NULL, speaker_say },
-    { "speaker.stop", "Stop the sound speaker.say or speaker.play_url is playing.", NULL, NULL, speaker_stop },
-    { "speaker.status",
-      "Whether the speaker is on, its volume, and what became of the last speaker.say or "
-      "speaker.play_url: fetching, playing, idle or failed (with the reason).",
-      NULL, NULL, speaker_status },
+    { "display.show_text",  show_text },
+    { "avatar.cheer",       avatar_cheer },
+    { "speaker.set_volume", set_volume },
+    { "speaker.beep",       beep },
+    { "speaker.play_url",   play_url },
+    { "speaker.say",        speaker_say },
+    { "speaker.stop",       speaker_stop },
+    { "speaker.status",     speaker_status },
 };
 
 static void describe(cJSON *commands, const impo_command_t *command)
 {
-    cJSON *entry = cJSON_CreateObject();
-    cJSON_AddStringToObject(entry, "description", command->description);
-    cJSON *required = command->required ? cJSON_Parse(command->required) : NULL;
-    cJSON *optional = command->optional ? cJSON_Parse(command->optional) : NULL;
-    cJSON_AddItemToObject(entry, "required", required ? required : cJSON_CreateObject());
-    cJSON_AddItemToObject(entry, "optional", optional ? optional : cJSON_CreateObject());
-    cJSON_AddItemToObject(commands, command->name, entry);
+    cJSON_AddItemToObject(commands, command->name, cJSON_CreateObject());
 }
 
 void impo_commands_capabilities(cJSON *params)

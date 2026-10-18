@@ -143,8 +143,7 @@ int main(void) {
     def test_registration_only_advertises_enabled_ota(self) -> None:
         noise = (ROOT / "main/noise_control.cpp").read_text()
         functions = "\n".join(function_source(noise, signature) for signature in (
-            "static cJSON *string_param(",
-            "static void add_command(",
+            "static cJSON *add_command(",
             "static void add_register_metadata_string(",
             "static char *build_register_json(",
         ))
@@ -201,6 +200,9 @@ int main(void) {
                 self.assertIn("device.health", commands)
                 self.assertIn("device.discover", commands)
                 self.assertEqual("device.ota" in commands, enabled)
+                # Names only: the product's manifest describes the commands.
+                self.assertEqual(commands["device.health"], {})
+                self.assertEqual(commands["device.discover"], {"timeout_ms": 90000})
                 self.assertEqual(params["version"], "999.0.0")
                 # The session's handshake hash reaches attestation unchanged.
                 self.assertEqual(params.get("attest"), "seen" if enabled else None)

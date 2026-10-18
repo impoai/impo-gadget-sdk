@@ -40,8 +40,8 @@ class FreenoveCarCommandsTest(unittest.TestCase):
                  "-DCJSON_NESTING_LIMIT=16", "-I", str(JSON), "-I", str(ROOT / "main"), "-I", str(out)]
         commands = [
             [*cc, *flags, "-c", str(JSON / "cJSON.c"), "-o", str(out / "cjson.o")],
-            [*cc, *flags, str(ROOT / "tests/freenove_4wd_car_harness.c"), str(ROOT / "main/command_params.c"),
-             str(out / "cjson.o"), "-lm", "-o", str(out / "car")],
+            [*cc, *flags, str(ROOT / "tests/freenove_4wd_car_harness.c"), str(out / "cjson.o"),
+             "-lm", "-o", str(out / "car")],
         ]
         for cmd in commands:
             compiled = subprocess.run(cmd, capture_output=True, text=True)
@@ -63,8 +63,10 @@ class FreenoveCarCommandsTest(unittest.TestCase):
         names = [c["name"] for c in manifest["commands"]]
         source = CAR.read_text()
         table = source[source.index("s_commands[] = {"):source.index("void freenove_car_describe")]
-        self.assertEqual(names[:len(re.findall(r'\{ "([a-z_.]+)",', table))],
-                         re.findall(r'\{ "([a-z_.]+)",', table))
+        registered = re.findall(r'\{ "([a-z_.]+)",', table)
+        self.assertEqual(names[:len(registered)], registered)
+        # The firmware names its commands and nothing more: the manifest describes them.
+        self.assertNotIn("description", table)
         self.assertIn("device.health", names)
         for c in manifest["commands"]:
             self.assertFalse(c["parameters"]["additionalProperties"], c["name"])
@@ -106,7 +108,6 @@ class FreenoveCarWiringTest(unittest.TestCase):
         cmake = (ROOT / "main/CMakeLists.txt").read_text()
         self.assertRegex(cmake, r'if\(CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR\)\s*'
                                 r'list\(APPEND GADGET_SRCS "freenove_4wd_car.c"\)')
-        self.assertIn('"command_params.c"', cmake)
         kconfig = (ROOT / "main/Kconfig.projbuild").read_text()
         self.assertRegex(kconfig, r'config HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR\n.*\n\s+depends on IDF_TARGET_ESP32\n')
         overlay = (ROOT / "devices/sdkconfig.freenove-4wd-car").read_text()
@@ -119,11 +120,6 @@ class FreenoveCarWiringTest(unittest.TestCase):
         self.assertTrue((ROOT / table).exists())
         board = (ROOT / "tools/board.sh").read_text()
         self.assertIn("devices/sdkconfig.$BOARD", block_case(board, "freenove-4wd-car)"))
-
-    def test_schema_checker_is_the_arcs_one(self):
-        ours = (ROOT / "main/command_params.c").read_text().replace("command_params", "gadget_params")
-        theirs = (ROOT.parent / "arcs/gadget/gadget_params.c").read_text()
-        self.assertEqual(ours.split("\n", 1)[1], theirs)
 
 
 def block_case(text, label):

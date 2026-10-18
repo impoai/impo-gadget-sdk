@@ -1232,25 +1232,12 @@ static void identity_on_frame(identity_fetch &f, const DecodedServiceFrame &fram
 
 // ---- JSON message builders -------------------------------------------------
 
-static cJSON *string_param(const char *description) {
-    cJSON *param = cJSON_CreateObject();
-    cJSON_AddStringToObject(param, "type", "string");
-    if (description) {
-        cJSON_AddStringToObject(param, "description", description);
-    }
-    return param;
-}
-
-static void add_command(cJSON *commands, const char *name,
-                        const char *description,
-                        cJSON *required, cJSON *optional) {
-    cJSON *command = cJSON_CreateObject();
-    cJSON_AddStringToObject(command, "description", description);
-    cJSON_AddItemToObject(command, "required",
-                          required ? required : cJSON_CreateObject());
-    cJSON_AddItemToObject(command, "optional",
-                          optional ? optional : cJSON_CreateObject());
-    cJSON_AddItemToObject(commands, name, command);
+// A command this firmware runs, by name only; returns its entry so a long
+// one can add its timeout_ms.
+static cJSON *add_command(cJSON *commands, const char *name) {
+    cJSON *entry = cJSON_CreateObject();
+    cJSON_AddItemToObject(commands, name, entry);
+    return entry;
 }
 
 static void add_register_metadata_string(cJSON **metadata, cJSON *params,
@@ -1325,25 +1312,15 @@ static char *build_register_json(const uint8_t *handshake_hash,
     cJSON_ReplaceItemInObject(params, "model_id", cJSON_CreateString("xteink-x4"));
 #endif
 
+    // The commands this firmware runs, by name. What each does and its
+    // parameters are in the product's manifest on the Impo platform
+    // (contracts/gadget-identity.md in impoai/impo), and the handlers check
+    // their own parameters.
     cJSON *commands = cJSON_CreateObject();
-    cJSON *name_required = cJSON_CreateObject();
-    cJSON_AddItemToObject(name_required, "name", string_param("The new name, 1 to 32 characters."));
-    add_command(commands, "device.set_name",
-                "Rename this gadget: the name the person calls it by, shown in the app and "
-                "used to tell their gadgets apart. 1 to 32 characters. The gadget reconnects "
-                "under the new name a moment later.",
-                name_required, nullptr);
-    add_command(commands, "device.health",
-                "Report basic Link health, including battery level (percent), "
-                "voltage, and whether it is charging or on USB power; each is "
-                "null when the device has no battery or can't measure it",
-                nullptr, nullptr);
+    add_command(commands, "device.set_name");
+    add_command(commands, "device.health");
 #if CONFIG_HOMEHUB_TUNNEL
-    add_command(commands, "device.discover",
-                "Scan local network for devices (ARP, mDNS, SSDP, SNMP, NetBIOS)",
-                nullptr, nullptr);
-    cJSON_AddNumberToObject(
-        cJSON_GetObjectItem(commands, "device.discover"), "timeout_ms", 90000);
+    cJSON_AddNumberToObject(add_command(commands, "device.discover"), "timeout_ms", 90000);
 #endif
 
 #if CONFIG_IMPO_ENABLED
@@ -1355,179 +1332,36 @@ static char *build_register_json(const uint8_t *handshake_hash,
 
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
     display_canvas_describe(commands);
-    cJSON *text_required = cJSON_CreateObject();
-    cJSON_AddItemToObject(text_required, "text", string_param("1 to 200 ASCII characters."));
-    add_command(commands, "display.show_text",
-                "Queue 1 to 200 ASCII characters on the X4 e-paper screen. "
-                "Newlines wrap; non-ASCII glyphs are not supported. Use display.draw_url "
-                "for Chinese text rendered into an image. Refresh takes about 4 seconds. "
-                "display.show_animation restores the connection status page.",
-                text_required, nullptr);
+    add_command(commands, "display.show_text");
 #endif
 
 #if CONFIG_HOMEHUB_DISPLAY_COMMANDS
     int disp_w, disp_h;
     if (led_status_display_info(&disp_w, &disp_h)) {
-        // The agent prepares images from this, so it states the bit depth
-        // and, for e-paper, the exact inks.
-        int bits = led_status_display_bits();
-        bool mono = bits == 1;
-        bool epaper = bits == 1 || bits == 4;
-        char desc[1536];
-        snprintf(desc, sizeof(desc),
-                 "Download an image and draw it on the %dx%d %s. Takes a "
-                 "baseline "
-                 "(not progressive) JPEG, shrunk 1/2, 1/4 or 1/8 on the "
-                 "device if needed and centred across, or raw RGB565 (high "
-                 "byte first, %d bytes per row).%s Plain http:// uses the least "
-                 "device memory. Replies when the image is drawn. Hides the "
-#if CONFIG_HOMEHUB_LED_BACKEND_IMPO
-                 "avatar until display.show_animation, a tap or the talk button. "
-                 "Some Impo screens are round and cut off the corners, so keep "
-                 "the subject in the middle. A JPEG as large as the screen "
-                 "looks best.",
-#else
-                 "%s until display.show_animation.",
-#endif
-                 disp_w, disp_h,
-                 mono ? "black and white e-paper screen, 1 bit per pixel"
-                 : bits == 4 ? "six-colour e-paper screen (E Ink Spectra 6), "
-                               "4 bits per pixel"
-                             : "colour screen, 16 bits per pixel (RGB565)",
-                 disp_w * 2,
-                 mono ? " The screen has no gray or colour: the device "
-                        "dithers them to black and white dots, so photos "
-                        "look grainy, and text and line art are sharpest "
-                        "in pure black and white (#000000 and #ffffff are "
-                        "shown exactly). It refreshes once the whole image "
-                        "is in, taking about 2 s and flashing, so send one "
-                        "whole screen rather than several parts. The image "
-                        "stays on screen without power."
-                 : bits == 4 ? " The screen has only six inks: black #000000, "
-                               "white #ffffff, yellow #ffff00, red #ff0000, "
-                               "blue #0000ff and green #00ff00, shown exactly. "
-                               "The device dithers every other colour and gray "
-                               "to dots of these, so photos look grainy and "
-                               "muted, and text, charts and flat artwork are "
-                               "sharpest drawn in those six colours only. It "
-                               "refreshes once the whole image is in, taking "
-                               "about 30 s and flashing, so send one whole "
-                               "screen rather than several parts, at most "
-                               "about once a minute. The image stays on "
-                               "screen without power."
-                             : ""
-#if !CONFIG_HOMEHUB_LED_BACKEND_IMPO
-                 , epaper ? "status screen" : "animation"
-#endif
-                 );
-        cJSON *url_required = cJSON_CreateObject();
-        cJSON_AddItemToObject(url_required, "url",
-                              string_param("http:// or https:// URL of the image."));
-        cJSON *url_optional = cJSON_CreateObject();
-        cJSON *top_param = cJSON_CreateObject();
-        cJSON_AddStringToObject(top_param, "type", "integer");
-        cJSON_AddStringToObject(top_param, "description",
-#if CONFIG_HOMEHUB_LED_BACKEND_IMPO
-                                "Row to draw the top of the image at; by default a JPEG "
-                                "is centred down the screen and raw data starts at 0.");
-#else
-                                "Row to draw the top of the image at; default 0.");
-#endif
-        cJSON_AddItemToObject(url_optional, "row", top_param);
-#if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
-        snprintf(desc, sizeof(desc), "Draw an image on the 480x800 black/white canvas. "
-                 "Give x,y,width,height together to preserve other regions; otherwise replace the whole screen. "
-                 "JPEG must be 8-bit baseline, 3-component YCbCr: NO progressive or single-component grayscale JPEG, PNG, WebP or HTML. "
-                 "Prepare with Pillow: im.convert('RGB').save('out.jpg',format='JPEG',progressive=False,subsampling=2). "
-                 "Publish a direct download URL (HTTP 200 image bytes, not a sharing/viewer/login page); check the downloaded file first. "
-                 "On invalid_image, convert the file before retrying; do not retry the unchanged URL. "
-                 "JPEG shrinks by 1/2,1/4,1/8 as needed and centres inside the rectangle. "
-                 "Or send big-endian RGB565 with width pixels per row. For exact placement, resize on the agent. "
-                 "Use refresh:false to compose images and text, then display.refresh once. "
-                 "Download errors may leave partial buffered pixels: redraw the region. "
-                 "http:// uses less RAM; HTTPS may return out_of_memory. Unicode text/formulas should be rendered into an image. "
-                 "One full e-paper refresh takes about 4 seconds.");
-        const char *region_keys[] = {"x", "y", "width", "height"};
-        for (const char *key : region_keys) {
-            cJSON *p = cJSON_AddObjectToObject(url_optional, key);
-            cJSON_AddStringToObject(p, "type", "integer");
-            cJSON_AddStringToObject(p, "description", "Rectangle in pixels. Supply all four; do not combine with row.");
-        }
-        cJSON *show = cJSON_AddObjectToObject(url_optional, "refresh");
-        cJSON_AddStringToObject(show, "type", "boolean");
-        cJSON_AddStringToObject(show, "description", "Refresh when downloaded; default true. False buffers until display.refresh.");
-#endif
-        add_command(commands, "display.draw_url", desc, url_required, url_optional);
         // The six-colour e-paper may first finish a status screen refresh,
         // then takes as long again for the image.
-        cJSON_AddNumberToObject(
-            cJSON_GetObjectItem(commands, "display.draw_url"), "timeout_ms",
-            bits == 4 ? 120000 : 60000);
-        add_command(commands, "display.show_animation",
-                    epaper ? "Clear the image and bring back the status screen "
-                           "and the agent's name."
-                         : "Clear the image and bring back the animation and "
-                           "the agent's name.",
-                    nullptr, nullptr);
+        cJSON_AddNumberToObject(add_command(commands, "display.draw_url"), "timeout_ms",
+                                led_status_display_bits() == 4 ? 120000 : 60000);
+        add_command(commands, "display.show_animation");
     }
 #endif
 
 #if CONFIG_HOMEHUB_VOICE
-    cJSON *volume_optional = cJSON_CreateObject();
-    cJSON *volume_param = cJSON_CreateObject();
-    cJSON_AddStringToObject(volume_param, "type", "integer");
-    cJSON_AddStringToObject(volume_param, "description",
-                            "Speaker volume, 0 to 100; kept across restarts.");
-    cJSON_AddItemToObject(volume_optional, "volume", volume_param);
-    add_command(commands, "voice.configure",
-                "Set the speaker volume. Without volume, "
-                "reports the current one.",
-                nullptr, volume_optional);
+    add_command(commands, "voice.configure");
 #endif
 
-#if CONFIG_HOMEHUB_SENSECAP_SENSORS
-    add_command(commands, "sensors.read",
-                "Read the air sensors: CO2 in ppm, the tVOC index (1-500, 100 "
-                "is typical), temperature in degrees Celsius and relative "
-                "humidity in percent. Each reading has its age in seconds; a "
-                "sensor with no recent reading is null. Temperature and "
-                "humidity need the Grove AHT20 plugged in.",
-                nullptr, nullptr);
-#endif
-#if CONFIG_HOMEHUB_RETERMINAL_SHT4X
-    add_command(commands, "sensors.read",
-                "Read the onboard air sensor: temperature in degrees Celsius "
-                "and relative humidity in percent. Each reading has its age "
-                "in seconds; a sensor with no recent reading is null.",
-                nullptr, nullptr);
+#if CONFIG_HOMEHUB_SENSECAP_SENSORS || CONFIG_HOMEHUB_RETERMINAL_SHT4X
+    add_command(commands, "sensors.read");
 #endif
 
 #if CONFIG_IMPO_CAMERA
-    if (const char *camera = impo_camera_name()) {
-        char description[200];
-        snprintf(description, sizeof(description),
-                 "Take one photo with the gadget's camera (%s) of whatever is in front of it, "
-                 "as a JPEG. Returned only when this command is explicitly invoked.", camera);
-        add_command(commands, "camera.capture", description, nullptr, nullptr);
-        cJSON_AddNumberToObject(
-            cJSON_GetObjectItem(commands, "camera.capture"), "timeout_ms", 30000);
+    if (impo_camera_name()) {
+        cJSON_AddNumberToObject(add_command(commands, "camera.capture"), "timeout_ms", 30000);
     }
 #endif
 
     if (ota_is_enabled()) {
-        cJSON *ota_required = cJSON_CreateObject();
-        cJSON_AddItemToObject(ota_required, "url",
-                              string_param("HTTPS URL of the .bin firmware image to flash."));
-        cJSON *ota_optional = cJSON_CreateObject();
-        cJSON *force_param = cJSON_CreateObject();
-        cJSON_AddStringToObject(force_param, "type", "boolean");
-        cJSON_AddStringToObject(force_param, "description",
-                                "Install even if the image version is not newer.");
-        cJSON_AddItemToObject(ota_optional, "force", force_param);
-        add_command(commands, "device.ota",
-                    "Download a firmware image from `url` and apply it "
-                    "(esp_https_ota), then reboot.",
-                    ota_required, ota_optional);
+        add_command(commands, "device.ota");
     }
 
     cJSON_AddItemToObject(params, "commands_v2", commands);

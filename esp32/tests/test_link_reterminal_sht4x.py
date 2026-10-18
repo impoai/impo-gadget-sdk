@@ -53,7 +53,7 @@ class LinkReterminalSht4xTest(unittest.TestCase):
 
     def test_command_is_advertised_and_dispatched_with_the_feature(self):
         noise = (ROOT / "main/noise_control.cpp").read_text()
-        start = noise.index("#if CONFIG_HOMEHUB_RETERMINAL_SHT4X")
+        start = noise.index("#if CONFIG_HOMEHUB_SENSECAP_SENSORS || CONFIG_HOMEHUB_RETERMINAL_SHT4X")
         self.assertIn('add_command(commands, "sensors.read"', noise[start:noise.index("#endif", start)])
         app = (ROOT / "main/app.c").read_text()
         start = app.index("static cJSON *on_ws_command(")
