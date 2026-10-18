@@ -111,7 +111,7 @@ class FreenoveCarWiringTest(unittest.TestCase):
         self.assertRegex(kconfig, r'config HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR\n.*\n\s+depends on IDF_TARGET_ESP32\n')
         overlay = (ROOT / "devices/sdkconfig.freenove-4wd-car").read_text()
         for line in ('CONFIG_IDF_TARGET="esp32"', "CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR=y",
-                     'CONFIG_GADGET_PRODUCT_ID="freenove-4wd-car"', 'CONFIG_ESPTOOLPY_FLASHSIZE="4MB"',
+                     'CONFIG_GADGET_PRODUCT_ID="e83921d6-c6fe-4d82-a4f6-ec02ddb37798"', 'CONFIG_ESPTOOLPY_FLASHSIZE="4MB"',
                      "CONFIG_ESP32_REV_MIN_3=y"):
             self.assertIn(line + "\n", overlay)
         self.assertRegex(overlay, r'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="([^"]+)"')
