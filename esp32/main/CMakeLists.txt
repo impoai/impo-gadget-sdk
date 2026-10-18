@@ -38,6 +38,7 @@ set(GADGET_SRCS
     "pairing_transcript.c"
     "factory_test.c"
     "gadget_attest.c"
+    "command_params.c"
 )
 
 set(GADGET_REQUIRES
@@ -89,6 +90,10 @@ endif()
 
 if(CONFIG_HOMEHUB_LED_BACKEND_DEVKIT_GPIO27 OR CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING OR CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE)
     list(APPEND GADGET_REQUIRES led_strip)
+endif()
+
+if(CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR)
+    list(APPEND GADGET_SRCS "freenove_4wd_car.c")
 endif()
 
 if(CONFIG_HOMEHUB_SENSECAP_SENSORS)

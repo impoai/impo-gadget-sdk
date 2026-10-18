@@ -242,6 +242,13 @@ A drive stops by itself when its time is up, and whenever the gadget stops
 hearing the base. `base` is `responding`, `silent` or `unknown`: whether the
 base answered the gadget, which proves the link, not the movement.
 
+On the Freenove 4WD car the base is its PCA9685 motor driver, `chassis.move`
+also takes `speed`? 0.1–1 (0.5), and a drive also stops when the Link session
+drops. Its results add `stopped` (why the last drive ended: `time_up`,
+`stop`, `link_lost`, `base_error`), `battery_v` and, without a charged
+battery, a `warning`: the wheels run only on its cells. Only its wheels are
+wired so far, so it registers `chassis.drive`, `move`, `stop` and `status`.
+
 ### `sensors.*` — the surroundings
 
 | Command | Who has it | Parameters | Result payload |

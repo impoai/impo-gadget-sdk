@@ -327,6 +327,16 @@ static bool led_hw_init(void) {
     ESP_LOGI(TAG, "LED status ready: addressable RGB (GPIO=%d)", LED_STRIP_GPIO);
     return true;
 }
+#elif CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+// The car's 12 lights are not wired yet (freenove_4wd_car.c): no status light.
+static void led_hw_set_color(rgb_t c) {
+    (void)c;
+}
+
+static bool led_hw_init(void) {
+    ESP_LOGI(TAG, "LED status disabled: Freenove 4WD car (lights not wired)");
+    return true;
+}
 #elif CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING || CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE
 static led_strip_handle_t s_strip = NULL;
 // Steady frames shown since the ring last turned green for "connected".
@@ -1114,7 +1124,7 @@ bool led_status_init(void) {
         return false;
     }
 
-#if CONFIG_HOMEHUB_LED_BACKEND_NONE || CONFIG_HOMEHUB_LED_BACKEND_IMPO
+#if CONFIG_HOMEHUB_LED_BACKEND_NONE || CONFIG_HOMEHUB_LED_BACKEND_IMPO || CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
     return true;
 #endif
 

@@ -24,8 +24,17 @@
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
 #include "xteink_x4.h"
 #endif
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+#include "freenove_4wd_car.h"
+#endif
 
 void app_main(void) {
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+    // First: the motor driver keeps running through a reset of the ESP32.
+    if (!freenove_car_init()) {
+        ESP_LOGE("link.main", "car drive timer failed to start; it will not drive");
+    }
+#endif
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
     if (!xteink_x4_init()) {
         ESP_LOGE("link.main", "X4 input/power initialization failed");

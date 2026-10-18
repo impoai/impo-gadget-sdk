@@ -192,7 +192,8 @@ menu "ESP32 Device SDK"
             have no status LED; their displays show the status colour in bars
             along the top and bottom edges, with an animation in between. The
             Home Assistant Voice PE shows the status colour on its LED ring.
-            Seeed reSpeaker Lite shows it on a single RGB LED.
+            Seeed reSpeaker Lite shows it on a single RGB LED. The Freenove
+            4WD car shows no status yet; it drives its wheels for the agent.
             The reTerminal E1001 and E1002 show a still status screen on
             their e-paper instead (black and white on the E1001, six colours
             on the E1002).
@@ -235,6 +236,10 @@ menu "ESP32 Device SDK"
         config HOMEHUB_LED_BACKEND_RESPEAKER_LITE
             bool "Seeed reSpeaker Lite single RGB LED (experimental)"
             depends on IDF_TARGET_ESP32S3
+
+        config HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+            bool "Freenove 4WD Car for ESP32: wheels and battery (no status light)"
+            depends on IDF_TARGET_ESP32
 
         config HOMEHUB_LED_BACKEND_IMPO
             bool "Impo display"
