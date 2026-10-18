@@ -15,6 +15,8 @@ static int64_t fake_now;
 static int fake_duty[4];
 static int fake_motor_writes;
 static int fake_motor_failures;    // writes still to fail
+static int fake_battery_mv = -1;
+static int fake_battery_reads;
 
 static bool car_hw_motors(const int duty[4]) {
     fake_motor_writes++;
@@ -24,6 +26,10 @@ static bool car_hw_motors(const int duty[4]) {
     }
     memcpy(fake_duty, duty, sizeof(fake_duty));
     return true;
+}
+static int car_hw_battery_mv(void) {
+    fake_battery_reads++;
+    return fake_battery_mv;
 }
 static int64_t car_now_ms(void) { return fake_now; }
 static void car_lock(void) {}
@@ -210,27 +216,37 @@ static void test_validation(void) {
 
 static void test_battery(void) {
     int pct = -1, mv = -1;
-    s_car.battery_mv = -1;
+    fake_battery_mv = -1;
     CHECK(!freenove_car_battery(&pct, &mv));
     cJSON *r = run("chassis.status", NULL);
     CHECK(cJSON_IsNull(cJSON_GetObjectItem(payload(r), "battery_v")));
     cJSON_Delete(r);
-    s_car.battery_mv = 948;   // on USB with no cells: reported, not as a battery
+    fake_battery_mv = 948;   // on USB with no cells: reported, not as a battery
     CHECK(!freenove_car_battery(&pct, &mv));
     r = run("chassis.status", NULL);
     CHECK(fabs(cJSON_GetObjectItem(payload(r), "battery_v")->valuedouble - 0.95) < 1e-9);
     CHECK(strstr(cJSON_GetStringValue(cJSON_GetObjectItem(payload(r), "warning")), "No charged battery"));
     cJSON_Delete(r);
-    s_car.battery_mv = 8400;
+    fake_battery_mv = 8400;
     CHECK(freenove_car_battery(&pct, &mv) && pct == 100 && mv == 8400);
-    s_car.battery_mv = 7200;
+    fake_battery_mv = 7200;
     CHECK(freenove_car_battery(&pct, &mv) && pct == 50);
-    s_car.battery_mv = 6100;
+    fake_battery_mv = 6100;
     r = run("chassis.status", NULL);
     CHECK(!strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(payload(r), "warning")), "The battery is nearly empty."));
     cJSON_Delete(r);
-    s_car.battery_mv = 5500;
+    fake_battery_mv = 5500;
     CHECK(freenove_car_battery(&pct, &mv) && pct == 0);
+    // Every ask reads the divider again: the switch may have just been turned on.
+    int reads = fake_battery_reads;
+    fake_battery_mv = 948;
+    CHECK(!freenove_car_battery(&pct, &mv));
+    fake_battery_mv = 8000;
+    r = run("chassis.status", NULL);
+    CHECK(fabs(cJSON_GetObjectItem(payload(r), "battery_v")->valuedouble - 8.0) < 1e-9);
+    cJSON_Delete(r);
+    CHECK(freenove_car_battery(&pct, &mv) && mv == 8000);
+    CHECK(fake_battery_reads == reads + 3);
 }
 
 static void test_register(void) {

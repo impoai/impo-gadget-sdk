@@ -77,6 +77,7 @@ static const char *TAG = "link.car";
 
 // Hardware, defined under "---- Hardware" (or by the host harness).
 static bool car_hw_motors(const int duty[4]);   // M1..M4, -4095..4095
+static int car_hw_battery_mv(void);   // read now; -1 if the ADC did not answer
 static int64_t car_now_ms(void);
 static void car_lock(void);     // no-ops until freenove_car_init()
 static void car_unlock(void);
@@ -88,8 +89,7 @@ static struct {
     double forward, turn;
     int64_t until_ms;
     const char *stopped;     // why the last drive ended
-    int battery_mv;          // -1 until the first reading
-} s_car = { .stopped = "not_started", .battery_mv = -1 };
+} s_car = { .stopped = "not_started" };
 
 static cJSON *car_error(const char *code, const char *message) {
     cJSON *result = cJSON_CreateObject();
@@ -148,16 +148,17 @@ static void car_add_state(cJSON *p) {
     } else {
         cJSON_AddStringToObject(p, "stopped", s_car.stopped);
     }
-    if (s_car.battery_mv < 0) {
+    int mv = car_hw_battery_mv();
+    if (mv < 0) {
         cJSON_AddNullToObject(p, "battery_v");
         return;
     }
-    cJSON_AddNumberToObject(p, "battery_v", round(s_car.battery_mv / 10.0) / 100.0);
-    if (s_car.battery_mv < CAR_BATTERY_PRESENT_MV) {
+    cJSON_AddNumberToObject(p, "battery_v", round(mv / 10.0) / 100.0);
+    if (mv < CAR_BATTERY_PRESENT_MV) {
         cJSON_AddStringToObject(p, "warning",
                                 "No charged battery (or the power switch is off): the wheels run off "
                                 "the two 18650 cells and will not move on USB alone.");
-    } else if (s_car.battery_mv < CAR_BATTERY_EMPTY_MV + 400) {
+    } else if (mv < CAR_BATTERY_EMPTY_MV + 400) {
         cJSON_AddStringToObject(p, "warning", "The battery is nearly empty.");
     }
 }
@@ -326,9 +327,7 @@ void freenove_car_stop(const char *reason) {
 }
 
 bool freenove_car_battery(int *percent, int *millivolts) {
-    car_lock();
-    int mv = s_car.battery_mv;
-    car_unlock();
+    int mv = car_hw_battery_mv();
     if (mv < CAR_BATTERY_PRESENT_MV) return false;
     *percent = car_battery_percent(mv);
     *millivolts = mv;
@@ -343,7 +342,6 @@ bool freenove_car_battery(int *percent, int *millivolts) {
 #define PCA9685_ADDR 0x5F
 #define BATTERY_ADC ADC_CHANNEL_4       // GPIO32
 #define BATTERY_DIVIDER 4
-#define BATTERY_EVERY_MS 30000
 #define CONSOLE_UART UART_NUM_0
 
 // PCA9685 registers.
@@ -421,7 +419,7 @@ static bool car_hw_motors(const int duty[4]) {
     return pca_write(PCA_LED0 + 4 * 8, &regs[0][0], sizeof(regs));
 }
 
-static void battery_read(void) {
+static int car_hw_battery_mv(void) {
     int sum = 0, n = 0;
     for (int i = 0; s_adc && i < 8; i++) {
         int raw, mv;
@@ -434,23 +432,14 @@ static void battery_read(void) {
         sum += mv;
         n++;
     }
-    if (n) {
-        car_lock();
-        s_car.battery_mv = sum / n * BATTERY_DIVIDER;
-        car_unlock();
-    }
+    return n ? sum / n * BATTERY_DIVIDER : -1;
 }
 
 static void car_task(void *arg) {
     (void)arg;
-    int64_t next_battery = car_now_ms() + BATTERY_EVERY_MS;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(20));
         car_tick();
-        if (car_now_ms() >= next_battery) {
-            battery_read();
-            next_battery = car_now_ms() + BATTERY_EVERY_MS;
-        }
     }
 }
 
@@ -526,11 +515,10 @@ bool freenove_car_init(void) {
         adc_cali_line_fitting_config_t cali = { .unit_id = ADC_UNIT_1, .atten = ADC_ATTEN_DB_12,
                                                 .bitwidth = ADC_BITWIDTH_DEFAULT };
         if (adc_cali_create_scheme_line_fitting(&cali, &s_cali) != ESP_OK) s_cali = NULL;
-        battery_read();
     } else {
         s_adc = NULL;
     }
-    ESP_LOGI(TAG, "battery %d mV", s_car.battery_mv);
+    ESP_LOGI(TAG, "battery %d mV", car_hw_battery_mv());
 
     s_car.ticking = xTaskCreate(car_task, "car", 3072, NULL, 6, NULL) == pdPASS;
     if (uart_driver_install(CONSOLE_UART, 512, 0, 0, NULL, 0) != ESP_OK
