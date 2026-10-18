@@ -98,10 +98,21 @@ Run the last line in every new terminal you build from.
 
 ### 2. Build
 
-From this directory, set your SDK token, then build:
+From this directory, set your SDK token:
 
 ```sh
 idf.py menuconfig   # ESP32 Device SDK > Impo Gadgets SDK token
+```
+
+In the same menu, check your board's RGB LED color order. **Addressable LED
+takes red first (RGB order)** (`CONFIG_HOMEHUB_LED_RGB_ORDER`) is on by
+default, which suits the DevKitC-1's LED. Turn it off if your board's LED is
+GRB. A mismatch swaps red and green, so a healthy connection can appear red.
+The separate, always-on red power LED is normal.
+
+Save the configuration, then build:
+
+```sh
 idf.py build
 ```
 
