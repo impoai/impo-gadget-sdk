@@ -1267,6 +1267,20 @@ static char *build_register_json(const uint8_t *handshake_hash,
     char wifi_ssid[sizeof(s_wifi_ssid)];
     copy_wifi_ssid(wifi_ssid, sizeof(wifi_ssid));
 
+    // Who this firmware says it is in link.register. ESP32 builds keep these
+    // defaults. A port of this file to another chip (impo-gadget-arcs) defines
+    // its own at compile time, and must not claim family "link": the server
+    // pushes ESP32 firmware updates to every "link" device.
+#ifndef NOISE_CTRL_PLATFORM
+#define NOISE_CTRL_PLATFORM "esp32"
+#endif
+#ifndef NOISE_CTRL_DEVICE_FAMILY
+#define NOISE_CTRL_DEVICE_FAMILY "link"
+#endif
+#ifndef NOISE_CTRL_MODEL_ID
+#define NOISE_CTRL_MODEL_ID "esp-link"
+#endif
+
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "type", "req");
     char uuid[40];
@@ -1280,11 +1294,11 @@ static char *build_register_json(const uint8_t *handshake_hash,
     cJSON *params = cJSON_CreateObject();
     cJSON_AddStringToObject(params, "node_id", s_node_id);
     cJSON_AddStringToObject(params, "display_name", s_display_name);
-    cJSON_AddStringToObject(params, "platform", "esp32");
+    cJSON_AddStringToObject(params, "platform", NOISE_CTRL_PLATFORM);
     const esp_app_desc_t *desc = esp_app_get_description();
     cJSON_AddStringToObject(params, "version", desc ? desc->version : "unknown");
-    cJSON_AddStringToObject(params, "device_family", "link");
-    cJSON_AddStringToObject(params, "model_id", "esp-link");
+    cJSON_AddStringToObject(params, "device_family", NOISE_CTRL_DEVICE_FAMILY);
+    cJSON_AddStringToObject(params, "model_id", NOISE_CTRL_MODEL_ID);
     cJSON_AddBoolToObject(params, "is_wakeup_supported", false);
     cJSON *metadata = nullptr;
     add_register_metadata_string(&metadata, params, "network_ssid", wifi_ssid);
