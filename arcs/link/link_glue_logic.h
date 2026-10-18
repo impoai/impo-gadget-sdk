@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-/* A product id as contracts/gadget-identity.md allows it: ^[a-z0-9-]{2,40}$.
+/* A product id as contracts/gadget-identity.md allows it: the lowercase UUID Impo assigned.
  * NULL and "" are "not set up" and also pass; anything else is refused. */
 bool link_product_id_ok(const char *id);
 

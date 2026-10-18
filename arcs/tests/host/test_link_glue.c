@@ -10,13 +10,13 @@
 static void test_product_id(void)
 {
     CHECK(link_product_id_ok(NULL) && link_product_id_ok(""), "no product id: not set up, allowed");
-    CHECK(link_product_id_ok("arcs-robot-dog"), "a-z and -");
-    CHECK(link_product_id_ok("p2") && link_product_id_ok("0123456789012345678901234567890123456789"),
-          "2 and 40 characters");
-    CHECK(!link_product_id_ok("p"), "1 character refused");
-    CHECK(!link_product_id_ok("01234567890123456789012345678901234567890"), "41 characters refused");
-    CHECK(!link_product_id_ok("Robot-Dog") && !link_product_id_ok("robot_dog") && !link_product_id_ok("robot dog"),
-          "upper case, _ and space refused");
+    CHECK(link_product_id_ok("6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1b2c"), "a lowercase UUID");
+    CHECK(!link_product_id_ok("arcs-robot-dog"), "a name is not a product id");
+    CHECK(!link_product_id_ok("6F1C2B9E-4A7D-4E2B-9C1A-3D5E7F9A1B2C"), "upper case refused");
+    CHECK(!link_product_id_ok("6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1b2"), "35 characters refused");
+    CHECK(!link_product_id_ok("6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1b2cd"), "37 characters refused");
+    CHECK(!link_product_id_ok("6f1c2b9e04a7d-4e2b-9c1a-3d5e7f9a1b2c") && !link_product_id_ok("6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1bzc"),
+          "a misplaced dash or a non-hex digit refused");
 }
 
 static void test_backoff(void)

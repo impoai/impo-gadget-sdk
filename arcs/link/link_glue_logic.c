@@ -9,8 +9,17 @@ bool link_product_id_ok(const char *id)
     if (id == NULL || id[0] == '\0') {
         return true;
     }
-    size_t n = strlen(id);
-    return n >= 2 && n <= 40 && strspn(id, "abcdefghijklmnopqrstuvwxyz0123456789-") == n;
+    /* A lowercase UUID: 8-4-4-4-12 hex digits. */
+    if (strlen(id) != 36) {
+        return false;
+    }
+    for (size_t i = 0; i < 36; i++) {
+        bool dash = i == 8 || i == 13 || i == 18 || i == 23;
+        if (dash ? id[i] != '-' : strchr("0123456789abcdef", id[i]) == NULL) {
+            return false;
+        }
+    }
+    return true;
 }
 
 uint32_t link_auth_refresh_interval_ms(unsigned refusals)

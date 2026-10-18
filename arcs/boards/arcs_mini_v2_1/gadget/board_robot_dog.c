@@ -63,7 +63,7 @@ static gadget_board_t s_board = {
     .ble_prefix = "ImpoGadget",
     /* The dog's product on the Impo developer platform: its manifest (what the dog is for,
      * its commands and events, from dog_events and s_instructions here) reaches the agent. */
-    .product_id = "arcs-robot-dog",
+    .product_id = "b4066283-da1a-4c2f-922a-bfa1ad4804e9",
     .init = init,
     .audio = {
         .speaker = true,

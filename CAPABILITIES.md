@@ -94,9 +94,9 @@ implements it.
 
 A gadget without a unit key can name a product its owner created on the Impo
 developer platform: set `CONFIG_GADGET_PRODUCT_ID` (`idf.py menuconfig` >
-ESP32 Device SDK) to the product's ID, 2 to 40 characters of `a-z`, `0-9` and
-`-`. The build fails on any other value. `link.register` then carries
-`"product_id": "desk-robot"`, only when the unit did not attest: an official
+ESP32 Device SDK) to the product's ID: the lowercase UUID Impo assigned when
+the product was created. The build fails on any other value. `link.register`
+then carries `"product_id": "6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1b2c"`, only when the unit did not attest: an official
 unit sends `unit_id` and `attest` and never a `product_id`. Nothing is
 proven: the binding holds only when the product's owner is the account the
 gadget is paired to, and the agent then gets the product's `dev` manifest.

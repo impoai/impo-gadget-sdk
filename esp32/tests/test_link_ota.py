@@ -178,7 +178,7 @@ static bool gadget_attest_add(cJSON *params, const uint8_t *hash, size_t len) {
     cJSON_AddStringToObject(params, "attest", "seen");
     return true;
 }
-#define CONFIG_GADGET_PRODUCT_ID "desk-robot"
+#define CONFIG_GADGET_PRODUCT_ID "6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1b2c"
 ''' + functions + '''
 int main(void) {
     for (int on = 0; on <= 1; on++) {
@@ -205,7 +205,7 @@ int main(void) {
                 # The session's handshake hash reaches attestation unchanged.
                 self.assertEqual(params.get("attest"), "seen" if enabled else None)
                 # Only a unit that did not attest names a product.
-                self.assertEqual(params.get("product_id"), None if enabled else "desk-robot")
+                self.assertEqual(params.get("product_id"), None if enabled else "6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1b2c")
                 for field in ("instructions", "events"):
                     self.assertNotIn(field, params)
 

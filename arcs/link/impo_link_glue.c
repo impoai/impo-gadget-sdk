@@ -399,7 +399,7 @@ int impo_link_start(void)
 
     const char *product = gadget_board_get()->product_id;
     if (!link_product_id_ok(product)) {
-        LISA_LOGE(TAG, "board product_id \"%s\" is not 2 to 40 of a-z, 0-9 and -; not sent", product);
+        LISA_LOGE(TAG, "board product_id \"%s\" is not a lowercase UUID; not sent", product);
         product = "";
     }
     esp_compat_set_product_id(product);

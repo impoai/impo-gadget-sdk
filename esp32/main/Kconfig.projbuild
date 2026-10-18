@@ -36,8 +36,9 @@ menu "ESP32 Device SDK"
         string "Impo product ID (custom gadgets)"
         default ""
         help
-            The ID of a product you created on the Impo developer platform,
-            2 to 40 characters of a-z, 0-9 and -. The gadget sends it in
+            The ID Impo assigned to a product you created on the Impo
+            developer platform: a lowercase UUID such as
+            6f1c2b9e-4a7d-4e2b-9c1a-3d5e7f9a1b2c. The gadget sends it in
             link.register, and the agent then gets that product's manifest:
             what the gadget is for, its commands and its events. It binds
             only when the product is yours, the account the gadget is paired

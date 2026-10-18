@@ -50,7 +50,7 @@ comes from the board.
 | Field | Meaning |
 |---|---|
 | `name`, `model_id`, `ble_prefix` | identity |
-| `product_id` | the product created for this gadget on the Impo developer platform, 2 to 40 of `a-z`, `0-9`, `-`; sent in `link.register` so the agent gets that product's manifest. NULL or `""`: not set up yet (registers as custom without a product). An invalid one is logged and not sent |
+| `product_id` | the ID Impo assigned to the product created for this gadget on the Impo developer platform, a lowercase UUID; sent in `link.register` so the agent gets that product's manifest. NULL or `""`: not set up yet (registers as custom without a product). An invalid one is logged and not sent |
 | `init` | pins, buses, the board's own parts |
 | `audio` | speaker / mic present, mic channel, gains, amp on/off |
 | `poll_buttons` | raw button edges |
