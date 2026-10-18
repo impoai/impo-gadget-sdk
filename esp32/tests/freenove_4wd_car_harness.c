@@ -27,6 +27,15 @@ static bool car_hw_motors(const int duty[4]) {
     memcpy(fake_duty, duty, sizeof(fake_duty));
     return true;
 }
+static int fake_servo_us[2];
+static bool car_hw_servo(int channel, int pulse_us) {
+    if (fake_motor_failures > 0) {
+        fake_motor_failures--;
+        return false;
+    }
+    fake_servo_us[channel] = pulse_us;
+    return true;
+}
 static int car_hw_battery_mv(void) {
     fake_battery_reads++;
     return fake_battery_mv;
@@ -210,7 +219,8 @@ static void test_validation(void) {
     // Parts not wired yet have no commands.
     CHECK(run("chassis.set_light", "{\"effect\":\"on\"}") == NULL);
     CHECK(refused("chassis.sense", "{\"pan\":90}", "takes no parameters"));
-    CHECK(run("servo.set_angle", "{\"pan\":90}") == NULL);
+    CHECK(refused("servo.set_angle", "{\"tilt\":40}", "tilt"));
+    CHECK(refused("servo.set_angle", "{\"pan\":181}", "pan"));
     CHECK(run("speaker.beep", NULL) == NULL);
     CHECK(run("device.health", NULL) == NULL);
     CHECK(!s_car.moving);                        // no refused call moved it
@@ -262,6 +272,24 @@ static void test_sense(void) {
     cJSON_Delete(r);
 }
 
+static void test_servo(void) {
+    cJSON *r = run("servo.set_angle", "{\"pan\":180}");
+    CHECK(ok(r) && fake_servo_us[0] == 2500 && s_car.pan == 180 && s_car.tilt == 90);
+    CHECK(cJSON_GetObjectItem(payload(r), "pan")->valueint == 180);
+    cJSON_Delete(r);
+    r = run("servo.set_angle", "{\"pan\":0,\"tilt\":135}");
+    CHECK(ok(r) && fake_servo_us[0] == 500 && fake_servo_us[1] == 2000 && s_car.tilt == 135);
+    cJSON_Delete(r);
+    r = run("servo.set_angle", "{}");
+    CHECK(!ok(r) && !strcmp(code(r), "invalid_param"));
+    cJSON_Delete(r);
+    fake_motor_failures = 1;   // the PCA9685 stops answering: the angle is not taken
+    r = run("servo.set_angle", "{\"pan\":90}");
+    CHECK(!ok(r) && !strcmp(code(r), "base_error") && s_car.pan == 0);
+    cJSON_Delete(r);
+    fake_motor_failures = 0;
+}
+
 static void test_register(void) {
     cJSON *commands = cJSON_CreateObject();
     freenove_car_describe(commands);
@@ -305,6 +333,7 @@ int main(void) {
     test_validation();
     test_battery();
     test_sense();
+    test_servo();
     test_register();
     if (failures) {
         fprintf(stderr, "%d check(s) failed\n", failures);

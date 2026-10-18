@@ -6,20 +6,23 @@
  * (Tutorial.pdf, "Pins of the Car" and chapters 1 and 2, and the sketches
  * below); the code is this firmware's own.
  *
- * What this drives, the wheels, the distance sensor, the camera and the
- * battery reading:
+ * What this drives, the wheels, the head's two servos, the distance sensor,
+ * the camera and the battery reading:
  * - I2C on GPIO13 (SDA) and GPIO14 (SCL) to a PCA9685 at 0x5F, run at
  *   50 Hz as Freenove does (Freenove_4WD_Car_For_ESP32.h). The motors' two
  *   inputs: M1 15/14, M2 9/8, M3 12/13, M4 10/11. M1 and M2 are the left
  *   wheels, M3 and M4 the right, and a positive duty on the first input
  *   drives forward (01.1_Car_Move_and_Turn). Below a duty of 1600 of 4095
- *   the gear motors stall (Motor_Move()).
+ *   the gear motors stall (Motor_Move()). Servo 1 on channel 0 pans the
+ *   head: 90 is straight ahead, larger looks left (02.2_Ultrasonic_Ranging_Car,
+ *   get_distance()). Servo 2 on channel 1 tilts it; Freenove keeps it at
+ *   80 to 180 (06.3, Servo_2_Angle()). Both start at 90.
  * - GPIO32: the battery divider, a quarter of the voltage of the two 18650
  *   cells (8.4 V full; Tutorial.pdf 2.4 and 01.4_Battery_level,
  *   batteryCoefficient 4).
  * - GPIO12 and GPIO15: the HC-SR04 ultrasonic trigger and echo, up to 3 m
  *   (02.1_Ultrasonic_Ranging, Get_Sonar()). Both are strapping pins, left low.
- *   It looks wherever servo 1 left the head; nothing turns it yet.
+ *   It looks where the head points.
  * - The camera on the head (an OV2640 or an OV3660, which esp32-camera tells
  *   apart), through the camera connector and an FPC cable to
  *   the WROVER's camera socket (Tutorial.pdf "Pins of the Car"): D0..D7 on
@@ -33,16 +36,13 @@
  * - the 12 WS2812 lights (GRB) on GPIO32, which they share with the battery
  *   divider, so the light driver must let go of the pin for each reading
  *   (01.6_WS2812);
- * - servo 1 on PCA9685 channel 0 (the ultrasonic head: 90 ahead, larger
- *   looks left, 02.2 get_distance()) and servo 2 on channel 1 (the camera
- *   head, kept at 80 to 180 by 06.3 Servo_2_Angle());
  * - the line-tracking sensors, a PCF8574 at 0x20, bits 0 to 2 left, middle,
  *   right (04.1 Track_Car());
  * - the photoresistors on GPIO33 (03.1, 03.2 Light_Car());
  * - the passive buzzer on GPIO2 (01.3);
  * - the VK16K33 LED matrix at 0x71.
  *
- * The wheels run off the cells: on USB alone the commands work, the PCA9685
+ * The wheels and servos run off the cells: on USB alone the commands work, the PCA9685
  * answers, and nothing moves. A drive is always bounded (10 s at most) and
  * ends on its own, on chassis.stop, when the Link session drops, and before
  * a restart.
@@ -89,6 +89,7 @@ static const char *TAG = "link.car";
 
 // Hardware, defined under "---- Hardware" (or by the host harness).
 static bool car_hw_motors(const int duty[4]);   // M1..M4, -4095..4095
+static bool car_hw_servo(int channel, int pulse_us);
 static int car_hw_battery_mv(void);   // read now; -1 if the ADC did not answer
 static int car_hw_distance_mm(void);  // -1 without an echo within 3 m
 static int64_t car_now_ms(void);
@@ -102,7 +103,8 @@ static struct {
     double forward, turn;
     int64_t until_ms;
     const char *stopped;     // why the last drive ended
-} s_car = { .stopped = "not_started" };
+    int pan, tilt;           // the head's servos, in degrees
+} s_car = { .stopped = "not_started", .pan = 90, .tilt = 90 };
 
 static cJSON *car_error(const char *code, const char *message) {
     cJSON *result = cJSON_CreateObject();
@@ -253,6 +255,30 @@ static cJSON *cmd_status(const cJSON *params) {
     return car_ok(payload);
 }
 
+// 0..180 degrees to 500..2500 us, the range Freenove maps its servos over.
+static int car_servo_us(int angle) {
+    return 500 + angle * 2000 / 180;
+}
+
+static cJSON *cmd_servo(const cJSON *params) {
+    const cJSON *pan = cJSON_GetObjectItem(params, "pan");
+    const cJSON *tilt = cJSON_GetObjectItem(params, "tilt");
+    if (!pan && !tilt) return car_error("invalid_param", "give pan, tilt or both");
+    bool ok = true;
+    cJSON *payload = cJSON_CreateObject();
+    car_lock();
+    if (pan && (ok = car_hw_servo(0, car_servo_us(pan->valueint)))) s_car.pan = pan->valueint;
+    if (ok && tilt && (ok = car_hw_servo(1, car_servo_us(tilt->valueint)))) s_car.tilt = tilt->valueint;
+    cJSON_AddNumberToObject(payload, "pan", s_car.pan);
+    cJSON_AddNumberToObject(payload, "tilt", s_car.tilt);
+    car_unlock();
+    if (!ok) {
+        cJSON_Delete(payload);
+        return car_error("base_error", "the servo driver (PCA9685 at I2C 0x5F) did not answer");
+    }
+    return car_ok(payload);
+}
+
 static cJSON *cmd_sense(const cJSON *params) {
     (void)params;
     cJSON *payload = cJSON_CreateObject();
@@ -301,6 +327,13 @@ static const car_command_t s_commands[] = {
       "Measure the distance in cm to what is in front of the car's ultrasonic head (null with no "
       "echo within 3 m).",
       NULL, NULL, cmd_sense },
+    { "servo.set_angle",
+      "Turn the car's head, which carries the camera and the distance sensor: pan turns it left and "
+      "right, tilt up and down. Give one or both. The servos need the battery switched on.",
+      NULL,
+      "{\"pan\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":180,\"description\":\"0 (right) to 180 (left); 90 ahead.\"},"
+      "\"tilt\":{\"type\":\"integer\",\"minimum\":80,\"maximum\":180,\"description\":\"80 to 180; 90 at start.\"}}",
+      cmd_servo },
 };
 
 void freenove_car_describe(cJSON *commands) {
@@ -453,6 +486,12 @@ static bool car_hw_motors(const int duty[4]) {
     return pca_write(PCA_LED0 + 4 * 8, &regs[0][0], sizeof(regs));
 }
 
+static bool car_hw_servo(int channel, int pulse_us) {
+    uint8_t regs[4];
+    pca_ticks(regs, pulse_us * 4096 / 20000);
+    return pca_write(PCA_LED0 + 4 * channel, regs, sizeof(regs));
+}
+
 static int car_hw_battery_mv(void) {
     int sum = 0, n = 0;
     for (int i = 0; s_adc && i < 8; i++) {
@@ -579,8 +618,12 @@ bool freenove_car_init(void) {
     // wheels are stopped before anything else.
     static const int zero[4] = {0, 0, 0, 0};
     s_car.base_ok = pca_init() && car_hw_motors(zero);
+    if (s_car.base_ok) {
+        car_hw_servo(0, car_servo_us(s_car.pan));
+        car_hw_servo(1, car_servo_us(s_car.tilt));
+    }
     ESP_LOGI(TAG, "PCA9685 at 0x%02X: %s", PCA9685_ADDR,
-             s_car.base_ok ? "ready, motors stopped" : "not answering");
+             s_car.base_ok ? "ready, motors stopped, head at 90" : "not answering");
     esp_register_shutdown_handler(car_shutdown);
 
     // The camera's own SCCB bus; esp32-camera finds it by its port.

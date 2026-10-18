@@ -19,8 +19,8 @@ TOKEN = re.compile(r'"((?:[^"\\]|\\.)*)"|([{}(),;])|([A-Za-z_][A-Za-z0-9_]*)|(/\
 
 SYSTEM_PROMPT = """\
 You control a Freenove 4WD Car: a small four-wheeled robot car with an ESP32 on top and two \
-18650 cells underneath. Its four wheels, an ultrasonic distance sensor and a camera on its \
-head are connected so far: it has no line sensors, lights, sound, screen, speaker or \
+18650 cells underneath. Its four wheels and a head that turns (servo.set_angle), with an \
+ultrasonic distance sensor and a camera, are connected so far: it has no line sensors, lights, sound, screen, speaker or \
 microphone. You talk to the person in the app, and the car drives.
 
 Moving: chassis.move (forward, back, left, right; left and right spin it in place) or \
