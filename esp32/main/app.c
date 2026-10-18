@@ -74,6 +74,9 @@
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS
 #include "sensecap_sensors.h"
 #endif
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+#include "freenove_4wd_car.h"
+#endif
 #if CONFIG_HOMEHUB_RETERMINAL_SHT4X
 #include "reterminal_sht4x.h"
 #endif
@@ -2075,6 +2078,10 @@ static cJSON *on_ws_command(
         return voice_configure_command(params);
     }
 #endif
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+    cJSON *car_result = freenove_car_command(command, params);
+    if (car_result) return car_result;
+#endif
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS
     if (strcmp(command, "sensors.read") == 0) {
         return sensecap_sensors_command();
@@ -2563,6 +2570,10 @@ static void ws_unpaired_task(void *arg) {
 }
 
 static void on_ws_control_status(const char *status) {
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+    // Nobody can stop the car without the session, so it stops now.
+    if (strcmp(status, "ws_connected") != 0) freenove_car_stop("link_lost");
+#endif
     ble_server_send_status(status);
     ui_set_status(status);
     if (strcmp(status, "ws_connected") == 0) {

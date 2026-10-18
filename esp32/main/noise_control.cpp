@@ -42,6 +42,9 @@ extern "C" {
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
 #include "display_canvas.h"
 #endif
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+#include "freenove_4wd_car.h"
+#endif
 #include "gadget_attest.h"
 #include "led_status.h"
 #include "ota.h"
@@ -1297,6 +1300,10 @@ static char *build_register_json(const uint8_t *handshake_hash,
 #if CONFIG_IMPO_ENABLED
     impo_commands_capabilities(params);   // what this gadget has, see CAPABILITIES.md
 #endif
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+    freenove_car_capabilities(params);
+    cJSON_ReplaceItemInObject(params, "model_id", cJSON_CreateString("freenove-4wd-car"));
+#endif
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
     cJSON *caps = cJSON_AddObjectToObject(params, "capabilities");
     cJSON_AddItemToObject(caps, "screen", display_canvas_info());
@@ -1327,6 +1334,9 @@ static char *build_register_json(const uint8_t *handshake_hash,
 
 #if CONFIG_IMPO_ENABLED
     impo_commands_describe(commands);
+#endif
+#if CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+    freenove_car_describe(commands);
 #endif
 
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
@@ -1633,6 +1643,12 @@ static void send_device_health(
         charging = cJSON_CreateBool(power.charging);
     }
     usb_power = cJSON_CreateBool(power.usb);
+#elif CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+    int car_pct, car_mv;
+    if (freenove_car_battery(&car_pct, &car_mv)) {
+        battery_pct = cJSON_CreateNumber(car_pct);
+        battery_mv = cJSON_CreateNumber(car_mv);
+    }
 #endif
     cJSON_AddItemToObject(metrics, "battery_pct",
                           battery_pct ? battery_pct : cJSON_CreateNull());

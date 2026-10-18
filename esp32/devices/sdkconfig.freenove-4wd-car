@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: MIT
+#
+# Freenove 4WD Car Kit for ESP32 (FNK0053): an ESP32-WROVER-E (ESP32-D0WD-V3,
+# 4 MB flash, 8 MB quad PSRAM) on Freenove's car board, with a CH340 USB
+# bridge (1a86:7523). Load last, after sdkconfig.defaults (see README.md in
+# this directory). Pins and parts: main/freenove_4wd_car.c.
+#
+# A Link gadget without a screen: its 12 lights show the status colours, and
+# it drives, steers its servos, beeps and reads its sensors for the agent.
+CONFIG_IDF_TARGET="esp32"
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# The lights, motors and sensors (main/freenove_4wd_car.c).
+CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR=y
+# Advertise as ImpoGadget-Car-XXXXXX, so it is easy to pick in the Impo app.
+CONFIG_HOMEHUB_BLE_NAME_SUFFIX="-Car"
+# BOOT button, active low. The infrared receiver shares the pin.
+CONFIG_HOMEHUB_BUTTON_GPIO=0
+# The product its owner created on the Impo developer platform: the agent
+# gets that product's manifest when the car is paired to the owner's account.
+CONFIG_GADGET_PRODUCT_ID="freenove-4wd-car"
+
+# Signed apps without Secure Boot use the Secure Boot V2 (RSA) scheme, which
+# the ESP32 supports from chip revision 3.0 (ESP32-D0WD-V3).
+CONFIG_ESP32_REV_MIN_3=y
+
+# 4 MB flash: one app slot and no OTA, the same layout as the Waveshare
+# ESP32-C6-LCD-1.47. DIO is the safe mode for the module's flash.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_waveshare_c6_lcd_147.csv"
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+
+# The WROVER's quad PSRAM, on GPIO16 and 17. 40 MHz is what every ESP32
+# PSRAM part runs at.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_40M=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+
+# Release the classic Bluetooth controller memory; pairing is BLE only.
+CONFIG_BTDM_CTRL_MODE_BLE_ONLY=y
+CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY=n
+CONFIG_BTDM_CTRL_MODE_BTDM=n
+
+# The ESP32 has far less IRAM than the C5; keep lwIP and Wi-Fi hot paths in
+# flash so the image links.
+CONFIG_LWIP_IRAM_OPTIMIZATION=n
+CONFIG_LWIP_EXTRA_IRAM_OPTIMIZATION=n
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+
+# The car has nothing to reach on the home network: no tunnel, which keeps
+# the internal RAM for the control session.
+CONFIG_HOMEHUB_TUNNEL=n

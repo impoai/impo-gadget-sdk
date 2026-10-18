@@ -74,6 +74,7 @@ before adding a feature to one.
 | Waveshare ESP32-S3-Touch-LCD-7 | `esp32s3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-waveshare-s3-lcd7` | `tools/impo/board.sh build lcd7` |
 | M5Stack StickC Plus2 | `esp32` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-stickc-plus2` | manual |
 | M5Stack Core2 (v1.0) | `esp32` | `devices/sdkconfig.impo;devices/sdkconfig.impo-m5stack-core2` | `tools/impo/board.sh build core2` |
+| Freenove 4WD Car Kit for ESP32 | `esp32` | `devices/sdkconfig.freenove-4wd-car` | `tools/board.sh freenove-4wd-car` (back up and erase NVS first; see `devices/README.md`) |
 | Xteink X4 (experimental, SSD1677) | `esp32c3` | `devices/sdkconfig.xteink-x4` | `tools/board.sh xteink-x4` (preserves bootloader and app0; see `devices/XTEINK_X4.md`) |
 | FoloToy AI Passport (experimental) | `esp32c3` | `devices/sdkconfig.impo;devices/sdkconfig.impo-ai-passport` | `tools/impo/board.sh build ai-passport` |
 
@@ -214,7 +215,7 @@ flash size and status backend.
    | Descriptor | Board |
    |---|---|
    | Espressif `303a:1001`, "USB JTAG/serial debug unit" | the chip's own USB: C5, C6, S3 and the S3 boards with the full UI. Its serial number is the MAC |
-   | CH340 (`1a86:7523`) | ideaspark, SenseCAP Indicator, reTerminal E1001 and E1002 |
+   | CH340 (`1a86:7523`) | ideaspark, SenseCAP Indicator, reTerminal E1001 and E1002, Freenove 4WD car |
    | CH9102 | M5Stack StickC Plus2 |
    | CH343 (`1a86:55d3`), "USB Single Serial" | Waveshare ESP32-S3-Touch-LCD-7 |
    | CH342, two `usbmodem` ports | SenseCAP Watcher: the S3 console is the one ending in `3`, the other is the Himax camera |
@@ -226,7 +227,8 @@ flash size and status backend.
    ```
 
    The target narrows it a long way: `esp32c5` is the DevKitC-1, `esp32c6` the
-   Waveshare C6 or a C6 devkit, `esp32` the ideaspark or the StickC Plus2.
+   Waveshare C6 or a C6 devkit, `esp32` the ideaspark, the StickC Plus2, the
+   Core2 or the Freenove 4WD car (an ESP32-D0WD-V3 with 4 MB of flash).
 
 4. **Fall back to a read-only capture.** If the board is mid-run and you can't
    write to the port, the `## Monitor` recipe below reads it without resetting,
@@ -399,7 +401,8 @@ Button (BOOT on the dev boards):
 
 The device advertises as `ImpoGadget-XXXXXX` (`ImpoGadget-Disp-XXXXXX` on the
 ideaspark, SenseCAP Indicator and reTerminal E1001 and E1002 overlays, `ImpoGadget-ha-voice-XXXXXX` on the
-Voice PE, `ImpoGadget-respeaker-XXXXXX` on the reSpeaker Lite). It uses
+Voice PE, `ImpoGadget-respeaker-XXXXXX` on the reSpeaker Lite, `ImpoGadget-Car-XXXXXX` on the
+Freenove 4WD car). It uses
 **community pairing v5**, so the phone app must support v5
 and list community devices. Community pairing needs the button press but has no
 manufacturer attestation, and it doesn't stop an active man-in-the-middle.

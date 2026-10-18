@@ -36,6 +36,8 @@
 #elif CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING || CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE
 #include "driver/gpio.h"
 #include "led_strip.h"
+#elif CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+#include "freenove_4wd_car.h"
 #elif CONFIG_HOMEHUB_DISPLAY
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
@@ -325,6 +327,17 @@ static bool led_hw_init(void) {
     }
 
     ESP_LOGI(TAG, "LED status ready: addressable RGB (GPIO=%d)", LED_STRIP_GPIO);
+    return true;
+}
+#elif CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+// The car's module owns the strip (it shares GPIO32 with the battery divider)
+// and shows this colour unless the agent picked an effect.
+static void led_hw_set_color(rgb_t c) {
+    freenove_car_status_light(c.r, c.g, c.b);
+}
+
+static bool led_hw_init(void) {
+    ESP_LOGI(TAG, "LED status ready: Freenove 4WD car lights (12 WS2812, GPIO=32)");
     return true;
 }
 #elif CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING || CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE

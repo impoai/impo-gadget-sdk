@@ -36,12 +36,14 @@
 #   waveshare-c6-lcd-147
 #              Waveshare ESP32-C6-LCD-1.47 with a 172x320 status screen
 #   xteink-x4  Xteink X4 ESP32-C3 with SSD1677 e-paper (experimental)
+#   freenove-4wd-car
+#              Freenove 4WD Car Kit for ESP32 (motors, lights, sensors)
 #
 # The action defaults to build. Without PORT, flash and monitor use the only
 # matching serial port, if there is exactly one.
 set -euo pipefail
 
-usage() { sed -n '16,39p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '16,41p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 [ $# -ge 1 ] || usage 2
 case "$1" in -h|--help) usage ;; esac
@@ -72,6 +74,11 @@ case "$BOARD" in
     [ "$BOARD" = ideaspark ] && TARGET=esp32 || TARGET=esp32s3
     DEFAULTS="$DEFAULTS;devices/sdkconfig.$BOARD"
     # CH340 bridge. The SenseCAP Indicator's RP2040 shows up as a usbmodem, not here.
+    PORTS="/dev/cu.usbserial-* /dev/cu.wchusbserial* /dev/ttyUSB*"
+    ;;
+  freenove-4wd-car)
+    TARGET=esp32
+    DEFAULTS="$DEFAULTS;devices/sdkconfig.$BOARD"
     PORTS="/dev/cu.usbserial-* /dev/cu.wchusbserial* /dev/ttyUSB*"
     ;;
   reterminal-e1001|reterminal-e1002)

@@ -195,7 +195,7 @@ gadget shows.
 | Command | Who has it | Parameters | Result payload |
 |---|---|---|---|
 | `speaker.set_volume` | any speaker | `percent` 0–100 | `{"percent"}` |
-| `speaker.beep` | any speaker | — | — |
+| `speaker.beep` | any speaker; the Freenove car's buzzer | — (the car: `frequency_hz`? 100–8000 (2000), `duration_ms`? 10–3000 (200)) | — (the car: `{"frequency_hz", "duration_ms"}`) |
 | `speaker.say` | any speaker with Hatch | `text` (1–1000 chars, any language) | `{"status": "fetching"}` |
 | `speaker.play_url` | any speaker with PSRAM | `url` (public https MP3, ≤ 1.5 MB, ~1 min) | `{"status": "fetching"}` |
 | `speaker.stop` | any speaker | — | — |
@@ -235,12 +235,20 @@ being shaken or turned.
 | `chassis.move` | `locomotion` | `direction` forward/back/left/right/stop, `duration_ms`? | `{"base", "moving"}` |
 | `chassis.stop` | `locomotion` | — | `{"base", "moving"}` |
 | `chassis.dance` | `locomotion` | — | `{"base", "moving"}` |
-| `chassis.set_light` | `lights` | `effect` on/blink/breathe_slow/breathe_fast/flowing/show/off | `{"base", "moving"}` |
+| `chassis.set_light` | `lights` | `effect` on/blink/breathe_slow/breathe_fast/flowing/show/off (the Freenove car also auto, `color`? #RRGGBB, `brightness`? 0–100 (50)) | `{"base", "moving"}` |
 | `chassis.status` | `locomotion` | — | `{"base", "moving"}` |
+| `chassis.sense` | Freenove car | — | `{"distance_cm", "pan", "line": {left, middle, right}, "light": {level, brighter}}`, each null when unread |
+| `servo.set_angle` | Freenove car | `pan`? 0–180, `tilt`? 80–180 (at least one) | `{"pan", "tilt"}` |
 
 A drive stops by itself when its time is up, and whenever the gadget stops
 hearing the base. `base` is `responding`, `silent` or `unknown`: whether the
 base answered the gadget, which proves the link, not the movement.
+
+On the Freenove 4WD car the base is its PCA9685 motor driver, `chassis.move`
+also takes `speed`? 0.1–1 (0.5), and a drive also stops when the Link session
+drops. Its results add `stopped` (why the last drive ended: `time_up`,
+`stop`, `link_lost`, `base_error`), `battery_v` and, without a charged
+battery, a `warning`: the wheels and servos run only on its cells.
 
 ### `sensors.*` — the surroundings
 
