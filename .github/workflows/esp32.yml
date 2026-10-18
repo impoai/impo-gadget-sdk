@@ -114,6 +114,9 @@ jobs:
           - board: ideaspark
             target: esp32
             overlays: ";devices/sdkconfig.ideaspark"
+          - board: velxio-sim
+            target: esp32
+            overlays: ";devices/sdkconfig.ideaspark;devices/sdkconfig.velxio-sim"
           - board: sensecap-indicator
             target: esp32s3
             overlays: ";devices/sdkconfig.sensecap-indicator"

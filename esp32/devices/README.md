@@ -436,6 +436,7 @@ board's overlays, in order:
 | ESP32-C6 devkit without PSRAM | `esp32c6` | [`devices/sdkconfig.c6-nopsram`](sdkconfig.c6-nopsram) | `tools/board.sh c6-nopsram build` |
 | ESP32-S3-DevKitC-1 | `esp32s3` | [`devices/sdkconfig.espressif-s3-devkitc-1`](sdkconfig.espressif-s3-devkitc-1) | `tools/board.sh espressif-s3-devkitc-1 build` |
 | ideaspark ESP32 | `esp32` | [`devices/sdkconfig.ideaspark`](sdkconfig.ideaspark) | `tools/board.sh ideaspark build` |
+| velxio-sim (emulator only, see [velxio-sim.md](velxio-sim.md)) | `esp32` | [`devices/sdkconfig.ideaspark`](sdkconfig.ideaspark), [`devices/sdkconfig.velxio-sim`](sdkconfig.velxio-sim) | `tools/board.sh velxio-sim build` |
 | Freenove 4WD Car Kit for ESP32 | `esp32` | [`devices/sdkconfig.freenove-4wd-car`](sdkconfig.freenove-4wd-car) | `tools/board.sh freenove-4wd-car build` |
 | Waveshare C6 LCD 1.47 | `esp32c6` | [`devices/sdkconfig.waveshare-c6-lcd-147`](sdkconfig.waveshare-c6-lcd-147) | `tools/board.sh waveshare-c6-lcd-147 build` |
 | Seeed SenseCAP Indicator | `esp32s3` | [`devices/sdkconfig.sensecap-indicator`](sdkconfig.sensecap-indicator) | `tools/board.sh sensecap-indicator build` |
