@@ -166,6 +166,9 @@ CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=32
 CONFIG_ESP_WIFI_TX_BA_WIN=32
 CONFIG_ESP_WIFI_RX_BA_WIN=32
+# 802.11k/v, so a mesh can steer the gadget to a nearer AP (rm_enabled and
+# btm_enabled in wifi_mgr.c). wifi_mgr also roams by itself on low signal.
+CONFIG_ESP_WIFI_11KV_SUPPORT=y
 
 # L3-over-WS tunnel: lwIP IP forwarding + NAPT so packets arriving on the tunnel
 # netif are source-NAT'd out the WiFi STA. (The thread-safe netifapi_* wrappers
