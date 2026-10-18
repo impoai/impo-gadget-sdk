@@ -72,6 +72,7 @@ set(GADGET_REQUIRES
     esp_driver_i2s
     esp_driver_pcnt
     esp_adc
+    camera
 )
 
 # E-paper has its own status screen in place of led_status.c.

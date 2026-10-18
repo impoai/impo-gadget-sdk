@@ -158,10 +158,11 @@ menu "Impo"
             Leave disabled to build without camera support.
 
     # The camera.capture command, on boards with a camera to register
-    # (components/camera): the Watcher's Himax, the ESP-SparkBot's OV2640.
+    # (components/camera): the Watcher's Himax, the ESP-SparkBot's OV2640
+    # and the Freenove car's OV2640 or OV3660.
     config IMPO_CAMERA
         bool
-        default y if IMPO_WATCHER_CAMERA || IMPO_BOARD_ESPRESSIF_SPARKBOT
+        default y if IMPO_WATCHER_CAMERA || IMPO_BOARD_ESPRESSIF_SPARKBOT || CAMERA_DVP
 
     config IMPO_CJK_FONT
         bool "Show Chinese and Japanese in captions"
