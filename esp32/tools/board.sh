@@ -38,12 +38,14 @@
 #   xteink-x4  Xteink X4 ESP32-C3 with SSD1677 e-paper (experimental)
 #   freenove-4wd-car
 #              Freenove 4WD Car Kit for ESP32 (motors, lights, sensors)
+#   velxio-sim ideaspark build for the Velxio ESP32 emulator (build only;
+#              run it with tools/velxio/)
 #
 # The action defaults to build. Without PORT, flash and monitor use the only
 # matching serial port, if there is exactly one.
 set -euo pipefail
 
-usage() { sed -n '16,41p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '16,43p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 [ $# -ge 1 ] || usage 2
 case "$1" in -h|--help) usage ;; esac
@@ -93,6 +95,12 @@ case "$BOARD" in
     # which board is on the port before flashing.
     PORTS="/dev/cu.usbmodem* /dev/ttyACM*"
     ;;
+  velxio-sim)
+    TARGET=esp32
+    DEFAULTS="$DEFAULTS;devices/sdkconfig.ideaspark;devices/sdkconfig.velxio-sim"
+    # No serial port: the board runs in the emulator.
+    PORTS=""
+    ;;
   waveshare-c6-lcd-147)
     TARGET=esp32c6
     DEFAULTS="$DEFAULTS;devices/sdkconfig.$BOARD"
@@ -130,6 +138,10 @@ if ! command -v idf.py >/dev/null 2>&1; then
 fi
 
 PORT_ARGS=()
+if [ "$ACTION" != build ] && [ -z "$PORTS" ]; then
+  echo "error: $BOARD has no hardware; only build applies" >&2
+  exit 2
+fi
 if [ "$ACTION" != build ]; then
   if [ -z "$PORT" ]; then
     # shellcheck disable=SC2086
