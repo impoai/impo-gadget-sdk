@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Runs the Freenove 4WD car's commands (main/freenove_4wd_car.c, the
-// host-tested part) against fake motors, servos, buzzer, lights and sensors.
+// host-tested part) against fake motors and a fake clock.
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -11,17 +11,10 @@
 #include "cJSON.h"
 #include "command_params.h"
 
-#define CAR_LEDS_FAKE 12
-
 static int64_t fake_now;
 static int fake_duty[4];
 static int fake_motor_writes;
 static int fake_motor_failures;    // writes still to fail
-static int fake_servo_us[2];
-static int fake_beep_hz, fake_beep_ms, fake_beep_off;
-static uint8_t fake_px[CAR_LEDS_FAKE][3];
-static int fake_light_writes;
-static int fake_distance_mm = -1, fake_line = -1, fake_light = -1;
 
 static bool car_hw_motors(const int duty[4]) {
     fake_motor_writes++;
@@ -32,23 +25,6 @@ static bool car_hw_motors(const int duty[4]) {
     memcpy(fake_duty, duty, sizeof(fake_duty));
     return true;
 }
-static bool car_hw_servo(int channel, int pulse_us) {
-    fake_servo_us[channel] = pulse_us;
-    return true;
-}
-static bool car_hw_beep(int hz, int ms) {
-    fake_beep_hz = hz;
-    fake_beep_ms = ms;
-    return true;
-}
-static void car_hw_beep_off(void) { fake_beep_off++; }
-static void car_hw_lights(const uint8_t px[CAR_LEDS_FAKE][3]) {
-    memcpy(fake_px, px, sizeof(fake_px));
-    fake_light_writes++;
-}
-static int car_hw_distance_mm(void) { return fake_distance_mm; }
-static int car_hw_line(void) { return fake_line; }
-static int car_hw_light_level(void) { return fake_light; }
 static int64_t car_now_ms(void) { return fake_now; }
 static void car_lock(void) {}
 static void car_unlock(void) {}
@@ -121,7 +97,6 @@ static void test_mixing(void) {
 }
 
 static void test_drive_ends_on_time(void) {
-    uint8_t px[CAR_LEDS_FAKE][3];
     fake_now = 1000;
     cJSON *r = run("chassis.drive", "{\"forward\":0.5,\"duration_ms\":300}");
     CHECK(ok(r));
@@ -130,10 +105,10 @@ static void test_drive_ends_on_time(void) {
     CHECK(fake_duty[0] > 0 && fake_duty[3] > 0);
     cJSON_Delete(r);
     fake_now = 1299;
-    car_tick(px);
+    car_tick();
     CHECK(s_car.moving && fake_duty[0] > 0);
     fake_now = 1300;
-    car_tick(px);
+    car_tick();
     CHECK(!s_car.moving && !strcmp(s_car.stopped, "time_up"));
     CHECK(fake_duty[0] == 0 && fake_duty[1] == 0 && fake_duty[2] == 0 && fake_duty[3] == 0);
 
@@ -141,7 +116,7 @@ static void test_drive_ends_on_time(void) {
     CHECK(ok(r) && s_car.until_ms == 1800);
     cJSON_Delete(r);
     fake_now = 1800;
-    car_tick(px);
+    car_tick();
     CHECK(!s_car.moving);
 
     r = run("chassis.move", "{\"direction\":\"back\",\"duration_ms\":10000}");
@@ -149,7 +124,7 @@ static void test_drive_ends_on_time(void) {
     CHECK(fake_duty[0] == -car_duty(0.5));   // speed 0.5 if left out
     cJSON_Delete(r);
     fake_now = 11800;
-    car_tick(px);
+    car_tick();
     CHECK(!s_car.moving && fake_duty[0] == 0);
 }
 
@@ -173,10 +148,8 @@ static void test_stop_preempts(void) {
 
     r = run("chassis.drive", "{\"forward\":0.8,\"duration_ms\":4000}");
     cJSON_Delete(r);
-    int beeps_off = fake_beep_off;
     freenove_car_stop("link_lost");
     CHECK(!s_car.moving && fake_duty[0] == 0 && !strcmp(s_car.stopped, "link_lost"));
-    CHECK(fake_beep_off == beeps_off + 1);
     freenove_car_stop("link_lost");   // not moving: the reason stays
     r = run("chassis.drive", "{\"forward\":0,\"turn\":0}");   // nothing to do is a stop
     CHECK(ok(r) && !s_car.moving && !strcmp(s_car.stopped, "stop"));
@@ -219,96 +192,20 @@ static void test_validation(void) {
     CHECK(refused("chassis.move", "{\"direction\":\"up\"}", "one of \"forward\""));
     CHECK(refused("chassis.move", "{\"direction\":\"forward\",\"speed\":0}", "from 0.1 to 1"));
     CHECK(refused("chassis.stop", "{\"now\":true}", "takes no parameters"));
-    CHECK(refused("chassis.set_light", "{\"effect\":\"rainbow\"}", "\"effect\""));
-    CHECK(refused("chassis.set_light", "{\"effect\":\"on\",\"color\":\"red\"}", "of exactly 7 characters"));
-    CHECK(refused("chassis.set_light", "{\"effect\":\"on\",\"color\":\"#12345g\"}", "#RRGGBB"));
-    CHECK(refused("chassis.set_light", "{\"effect\":\"on\",\"brightness\":101}", "from 0 to 100"));
-    CHECK(refused("servo.set_angle", "{\"tilt\":79}", "from 80 to 180"));
-    CHECK(refused("servo.set_angle", "{\"pan\":-1}", "from 0 to 180"));
-    CHECK(refused("servo.set_angle", "{}", "give pan, tilt or both"));
-    CHECK(refused("speaker.beep", "{\"duration_ms\":3001}", "from 10 to 3000"));
-    CHECK(refused("speaker.beep", "{\"frequency_hz\":99}", "from 100 to 8000"));
+    CHECK(refused("chassis.status", "{\"verbose\":true}", "takes no parameters"));
     cJSON *list = cJSON_CreateArray();
     cJSON *r = freenove_car_command("chassis.drive", list);
     CHECK(!ok(r) && strstr(message(r), "must be an object"));
     cJSON_Delete(r);
     cJSON_Delete(list);
     CHECK(run("chassis.dance", NULL) == NULL);   // not the car's: Link answers it
+    // Parts not wired yet have no commands.
+    CHECK(run("chassis.set_light", "{\"effect\":\"on\"}") == NULL);
+    CHECK(run("chassis.sense", NULL) == NULL);
+    CHECK(run("servo.set_angle", "{\"pan\":90}") == NULL);
+    CHECK(run("speaker.beep", NULL) == NULL);
     CHECK(run("device.health", NULL) == NULL);
     CHECK(!s_car.moving);                        // no refused call moved it
-}
-
-static void test_lights(void) {
-    fake_now = 40000;
-    freenove_car_status_light(80, 25, 0);
-    CHECK(fake_px[0][0] == 80 && fake_px[11][1] == 25);   // auto shows the status colour
-    cJSON *r = run("chassis.set_light", "{\"effect\":\"on\",\"color\":\"#FF8000\",\"brightness\":50}");
-    CHECK(ok(r) && fake_px[0][0] == 128 && fake_px[0][1] == 64 && fake_px[0][2] == 0);
-    cJSON_Delete(r);
-    int writes = fake_light_writes;
-    freenove_car_status_light(0, 0, 80);   // the agent's effect stays
-    CHECK(fake_light_writes == writes && fake_px[0][0] == 128);
-
-    r = run("chassis.set_light", "{\"effect\":\"blink\"}");   // white, 50 if left out
-    CHECK(ok(r) && fake_px[5][0] == 128 && fake_px[5][2] == 128);
-    cJSON_Delete(r);
-    uint8_t px[CAR_LEDS_FAKE][3];
-    fake_now = 40500;
-    CHECK(car_tick(px) && px[0][0] == 0);
-    fake_now = 41000;
-    CHECK(car_tick(px) && px[0][0] == 128);
-
-    r = run("chassis.set_light", "{\"effect\":\"flowing\",\"color\":\"#00ff00\",\"brightness\":100}");
-    cJSON_Delete(r);
-    car_tick(px);
-    int lit = 0;
-    for (int i = 0; i < CAR_LEDS_FAKE; i++) lit += px[i][1] > 0;
-    CHECK(lit == 4 && px[0][1] == 255);
-
-    r = run("chassis.set_light", "{\"effect\":\"show\"}");
-    cJSON_Delete(r);
-    CHECK(car_tick(px) && (px[0][0] || px[0][1] || px[0][2]));
-
-    r = run("chassis.set_light", "{\"effect\":\"off\"}");
-    CHECK(ok(r) && !car_tick(px) && fake_px[3][0] == 0 && fake_px[3][1] == 0);
-    cJSON_Delete(r);
-    r = run("chassis.set_light", "{\"effect\":\"auto\"}");
-    CHECK(ok(r) && fake_px[0][2] == 80);   // back to the status colour
-    cJSON_Delete(r);
-}
-
-static void test_servo_beep_and_sensors(void) {
-    cJSON *r = run("servo.set_angle", "{\"pan\":0}");
-    CHECK(ok(r) && fake_servo_us[0] == 500 && s_car.pan == 0);
-    cJSON_Delete(r);
-    r = run("servo.set_angle", "{\"pan\":180,\"tilt\":135}");
-    CHECK(ok(r) && fake_servo_us[0] == 2500 && fake_servo_us[1] == 2000);
-    CHECK(cJSON_GetObjectItem(payload(r), "tilt")->valueint == 135);
-    cJSON_Delete(r);
-
-    r = run("speaker.beep", NULL);
-    CHECK(ok(r) && fake_beep_hz == 2000 && fake_beep_ms == 200);
-    cJSON_Delete(r);
-    r = run("speaker.beep", "{\"frequency_hz\":440,\"duration_ms\":1000}");
-    CHECK(ok(r) && fake_beep_hz == 440 && fake_beep_ms == 1000);
-    cJSON_Delete(r);
-
-    s_car.battery_mv = 7900;
-    r = run("chassis.sense", NULL);
-    CHECK(ok(r) && cJSON_IsNull(cJSON_GetObjectItem(payload(r), "distance_cm")));
-    CHECK(cJSON_IsNull(cJSON_GetObjectItem(payload(r), "line")));
-    CHECK(!cJSON_GetObjectItem(payload(r), "warning"));
-    cJSON_Delete(r);
-    fake_distance_mm = 234;
-    fake_line = 2;
-    fake_light = 3000;
-    r = run("chassis.sense", NULL);
-    cJSON *p = payload(r);
-    CHECK(fabs(cJSON_GetObjectItem(p, "distance_cm")->valuedouble - 23.4) < 1e-9);
-    cJSON *line = cJSON_GetObjectItem(p, "line");
-    CHECK(cJSON_IsFalse(cJSON_GetObjectItem(line, "left")) && cJSON_IsTrue(cJSON_GetObjectItem(line, "middle")));
-    CHECK(!strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(cJSON_GetObjectItem(p, "light"), "brighter")), "right"));
-    cJSON_Delete(r);
 }
 
 static void test_battery(void) {
@@ -323,9 +220,6 @@ static void test_battery(void) {
     r = run("chassis.status", NULL);
     CHECK(fabs(cJSON_GetObjectItem(payload(r), "battery_v")->valuedouble - 0.95) < 1e-9);
     CHECK(strstr(cJSON_GetStringValue(cJSON_GetObjectItem(payload(r), "warning")), "No charged battery"));
-    cJSON_Delete(r);
-    r = run("chassis.sense", NULL);
-    CHECK(cJSON_GetObjectItem(payload(r), "warning") != NULL);
     cJSON_Delete(r);
     s_car.battery_mv = 8400;
     CHECK(freenove_car_battery(&pct, &mv) && pct == 100 && mv == 8400);
@@ -380,8 +274,6 @@ int main(void) {
     test_stop_preempts();
     test_motor_driver_missing();
     test_validation();
-    test_lights();
-    test_servo_beep_and_sensors();
     test_battery();
     test_register();
     if (failures) {

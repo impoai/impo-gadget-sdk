@@ -36,8 +36,6 @@
 #elif CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING || CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE
 #include "driver/gpio.h"
 #include "led_strip.h"
-#elif CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
-#include "freenove_4wd_car.h"
 #elif CONFIG_HOMEHUB_DISPLAY
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
@@ -330,14 +328,13 @@ static bool led_hw_init(void) {
     return true;
 }
 #elif CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
-// The car's module owns the strip (it shares GPIO32 with the battery divider)
-// and shows this colour unless the agent picked an effect.
+// The car's 12 lights are not wired yet (freenove_4wd_car.c): no status light.
 static void led_hw_set_color(rgb_t c) {
-    freenove_car_status_light(c.r, c.g, c.b);
+    (void)c;
 }
 
 static bool led_hw_init(void) {
-    ESP_LOGI(TAG, "LED status ready: Freenove 4WD car lights (12 WS2812, GPIO=32)");
+    ESP_LOGI(TAG, "LED status disabled: Freenove 4WD car (lights not wired)");
     return true;
 }
 #elif CONFIG_HOMEHUB_LED_BACKEND_VOICE_RING || CONFIG_HOMEHUB_LED_BACKEND_RESPEAKER_LITE
@@ -1127,7 +1124,7 @@ bool led_status_init(void) {
         return false;
     }
 
-#if CONFIG_HOMEHUB_LED_BACKEND_NONE || CONFIG_HOMEHUB_LED_BACKEND_IMPO
+#if CONFIG_HOMEHUB_LED_BACKEND_NONE || CONFIG_HOMEHUB_LED_BACKEND_IMPO || CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
     return true;
 #endif
 

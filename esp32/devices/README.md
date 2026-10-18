@@ -60,18 +60,18 @@ session to Impo. The rest depends on the hardware.
 | **M5Stack Core2 (v1.0)** | ESP32 | 2.0" 320×240 touch LCD | 16 MB / 8 MB | [M5Stack docs](https://docs.m5stack.com/en/core/Core2), [M5Unified](https://github.com/m5stack/M5Unified) | — |
 | **Freenove FNK0104B** | ESP32-S3 | 2.8" 240×320 LCD, touch | 16 MB / 8 MB | [Freenove repo](https://github.com/Freenove/Freenove_ESP32_S3_Display) | — |
 | **VN ESP32-S3 1.83-inch NV3023** | ESP32-S3 | 1.83" 284×240 LCD (NV3023) | 16 MB / 8 MB | [xiaozhi-esp32_vietnam board](https://github.com/TienHuyIoT/xiaozhi-esp32_vietnam) | — |
-| **Freenove 4WD Car Kit for ESP32 (FNK0053)** | ESP32 | None (12 WS2812 lights) | 4 MB / 8 MB | [Freenove repo](https://github.com/Freenove/Freenove_4WD_Car_Kit_for_ESP32) | — |
+| **Freenove 4WD Car Kit for ESP32 (FNK0053)** | ESP32 | None | 4 MB / 8 MB | [Freenove repo](https://github.com/Freenove/Freenove_4WD_Car_Kit_for_ESP32) | — |
 
 ## Features
 
 | | DevKitC-1 | C6 devkit | ideaspark | Waveshare C6 LCD 1.47 | SenseCAP Indicator | reTerminal E1001 | reTerminal E1002 | HA Voice PE | reSpeaker Lite (experimental) | Waveshare S3 1.75C | Waveshare S3 1.75 | Waveshare S3 2.16 | ESP-SparkBot | AIPI Lite | Waveshare C6 1.8 | Waveshare C6 2.06 | Watcher | StickS3 | StickC Plus2 | Cardputer ADV | BOX-3 | StopWatch | CoreS3 | Core2 | FNK0104B | S3 DevKitC-1 | JC3248W535 | VN S3 1.83-inch | Waveshare LCD7 | AI Passport | Xteink X4 | Freenove 4WD car |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:| :-: | :-: |
 | Home-network tunnel | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — |
-| Shows status on | Light | Light | Screen | Screen | Screen | E-paper | E-paper | Light ring | RGB LED | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Light | Avatar | Avatar | Avatar | Avatar | E-paper | 12 lights |
+| Shows status on | Light | Light | Screen | Screen | Screen | E-paper | E-paper | Light ring | RGB LED | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Light | Avatar | Avatar | Avatar | Avatar | E-paper | Nothing yet |
 | Images from Impo | — | — | ✅ | ✅ | ✅ | Black and white | Six colours | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | Black and white | — |
 | UI and settings | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Experimental | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | Experimental | — | — |
 | Push-to-talk | — | — | — | — | — | — | — | ✅ | XIAO BOOT | ✅ | ✅ | ✅ | ✅ | ✅ | Text replies | Text replies | ✅ | ✅ | ✅ | Text replies (experimental) | ✅ | ✅ | ✅ | ✅ | ✅ | — | With an added I2S mic | ✅ | — | Text replies (experimental) | — | — |
-| Speaker and mic | — | — | — | — | — | — | — | ✅ | 16 kHz I2S | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Buzzer and mic | ES8311 (experimental) | ✅ | ✅ | ✅ | ✅ | ES8311 | — | Speaker (NS4168), no mic | ES8311, ES7210 | — | ES8311 (experimental) | — | Buzzer only |
+| Speaker and mic | — | — | — | — | — | — | — | ✅ | 16 kHz I2S | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Buzzer and mic | ES8311 (experimental) | ✅ | ✅ | ✅ | ✅ | ES8311 | — | Speaker (NS4168), no mic | ES8311, ES7210 | — | ES8311 (experimental) | — | — |
 | Air sensors | — | — | — | — | D1S, D1Pro | Temperature, humidity | Temperature, humidity | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 | Touch | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | — | — |
 | Battery status | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Voltage only | — | — | ✅ | ✅ | ✅ | Voltage only | — | — | Percent only | — | No charging state | — | No charging state |
@@ -84,21 +84,21 @@ session, so push-to-talk sends your voice note over its control session to the
 Impo it's paired with, and the reply scrolls past as text. It can't show images either: the UI holds a whole image in
 PSRAM, where the ideaspark draws one straight to its screen.
 
-The Freenove 4WD car has no screen, speaker or microphone. Impo drives it
-(`chassis.drive`, `chassis.move`, `chassis.stop`), sets its 12 lights
-(`chassis.set_light`), turns its two servos (`servo.set_angle`), sounds its
-buzzer (`speaker.beep`) and reads its ultrasonic, line and light sensors
-(`chassis.sense`); the lights show the status colours otherwise. Every drive
-lasts at most 10 seconds and stops on its own, on `chassis.stop`, and when the
-session drops. The wheels and servos run only on the two 18650 cells with the
-power switch on. Its 4 MB of flash hold one app slot, so there are no
-over-the-air updates, and the first flash replaces Freenove's own firmware:
-back it up first (`python -m esptool -p PORT read-flash 0 0x400000
-freenove.bin`; the CH340 drops bytes on long reads, so read it in 256 KB
-pieces if that fails), and erase NVS (`erase-region 0x11000 0x5000`) before
-the first flash, since the old app's bytes are there. The camera and the LED
-matrix aren't used. Over USB, `>car chassis.status` (any of its commands, with
-JSON parameters after the name) runs a command and prints `@car {result}`.
+The Freenove 4WD car has only its four wheels and its power wired so far.
+Impo drives it (`chassis.drive`, `chassis.move`, `chassis.stop`,
+`chassis.status`), and `device.health` reports its battery; it shows no
+status. The lights, servos, buzzer, ultrasonic, line and light sensors and
+the camera aren't used yet (`main/freenove_4wd_car.c` lists their pins).
+Every drive lasts at most 10 seconds and stops on its own, on
+`chassis.stop`, and when the session drops. The wheels run only on the two
+18650 cells with the power switch on. Its 4 MB of flash hold one app slot,
+so there are no over-the-air updates, and the first flash replaces
+Freenove's own firmware: back it up first (`python -m esptool -p PORT
+read-flash 0 0x400000 freenove.bin`; the CH340 drops bytes on long reads, so
+read it in 256 KB pieces if that fails), and erase NVS (`erase-region
+0x11000 0x5000`) before the first flash, since the old app's bytes are
+there. Over USB, `>car chassis.status` (any of its commands, with JSON
+parameters after the name) runs a command and prints `@car {result}`.
 `tools/freenove_4wd_car_manifest.py` prints the product manifest for the
 developer platform from the firmware's command table.
 

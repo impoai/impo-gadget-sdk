@@ -5,12 +5,12 @@
 # bridge (1a86:7523). Load last, after sdkconfig.defaults (see README.md in
 # this directory). Pins and parts: main/freenove_4wd_car.c.
 #
-# A Link gadget without a screen: its 12 lights show the status colours, and
-# it drives, steers its servos, beeps and reads its sensors for the agent.
+# A Link gadget without a screen or status light: it drives its four wheels
+# for the agent and reports its battery. Only the wheels are wired so far.
 CONFIG_IDF_TARGET="esp32"
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
-# The lights, motors and sensors (main/freenove_4wd_car.c).
+# The wheels and the battery reading (main/freenove_4wd_car.c).
 CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR=y
 # Advertise as ImpoGadget-Car-XXXXXX, so it is easy to pick in the Impo app.
 CONFIG_HOMEHUB_BLE_NAME_SUFFIX="-Car"
