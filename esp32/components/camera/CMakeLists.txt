@@ -15,7 +15,7 @@
 set(srcs "camera.c" "sscma_proto.c" "camera_sscma.c")
 # A parallel sensor needs esp32-camera, pulled in for just those boards
 # (idf_component.yml).
-if(CONFIG_IMPO_BOARD_ESPRESSIF_SPARKBOT)
+if(CONFIG_CAMERA_DVP)
     list(APPEND srcs "camera_dvp.c")
 endif()
 

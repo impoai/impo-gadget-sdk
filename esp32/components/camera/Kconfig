@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+menu "Camera"
+
+    # A parallel (DVP) sensor driven by esp32-camera (camera_dvp.c): the
+    # ESP-SparkBot's and the Freenove 4WD car's. It pulls in esp32-camera
+    # and esp_new_jpeg (idf_component.yml).
+    config CAMERA_DVP
+        bool
+        default y if IMPO_BOARD_ESPRESSIF_SPARKBOT || HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR
+
+endmenu

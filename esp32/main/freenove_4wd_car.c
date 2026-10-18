@@ -6,7 +6,8 @@
  * (Tutorial.pdf, "Pins of the Car" and chapters 1 and 2, and the sketches
  * below); the code is this firmware's own.
  *
- * What this drives, the wheels, the distance sensor and the battery reading:
+ * What this drives, the wheels, the distance sensor, the camera and the
+ * battery reading:
  * - I2C on GPIO13 (SDA) and GPIO14 (SCL) to a PCA9685 at 0x5F, run at
  *   50 Hz as Freenove does (Freenove_4WD_Car_For_ESP32.h). The motors' two
  *   inputs: M1 15/14, M2 9/8, M3 12/13, M4 10/11. M1 and M2 are the left
@@ -19,6 +20,12 @@
  * - GPIO12 and GPIO15: the HC-SR04 ultrasonic trigger and echo, up to 3 m
  *   (02.1_Ultrasonic_Ranging, Get_Sonar()). Both are strapping pins, left low.
  *   It looks wherever servo 1 left the head; nothing turns it yet.
+ * - The camera on the head (an OV2640 or an OV3660, which esp32-camera tells
+ *   apart), through the camera connector and an FPC cable to
+ *   the WROVER's camera socket (Tutorial.pdf "Pins of the Car"): D0..D7 on
+ *   GPIO4, 5, 18, 19, 36, 39, 34, 35, VSYNC 25, HREF 23, PCLK 22, XCLK 21,
+ *   SCCB on GPIO26 (SDA) and 27 (SCL), no power-down or reset line. Link's
+ *   camera.capture takes its photos (components/camera).
  * - GPIO0: the BOOT button, shared with the infrared receiver (05.1).
  *
  * Future work, for parts not wired on this car yet (no commands until they
@@ -33,7 +40,7 @@
  *   right (04.1 Track_Car());
  * - the photoresistors on GPIO33 (03.1, 03.2 Light_Car());
  * - the passive buzzer on GPIO2 (01.3);
- * - the OV2640 camera and the VK16K33 LED matrix at 0x71.
+ * - the VK16K33 LED matrix at 0x71.
  *
  * The wheels run off the cells: on USB alone the commands work, the PCA9685
  * answers, and nothing moves. A drive is always bounded (10 s at most) and
@@ -47,6 +54,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "camera.h"
+#include "camera_dvp.h"
 #include "command_params.h"
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
@@ -59,6 +68,7 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "mbedtls/base64.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
@@ -361,6 +371,8 @@ bool freenove_car_battery(int *percent, int *millivolts) {
 #define PCA9685_ADDR 0x5F
 #define BATTERY_ADC ADC_CHANNEL_4       // GPIO32
 #define BATTERY_DIVIDER 4
+#define CAM_SDA GPIO_NUM_26
+#define CAM_SCL GPIO_NUM_27
 #define SONIC_TRIG GPIO_NUM_12
 #define SONIC_ECHO GPIO_NUM_15
 #define SONIC_MAX_US 18000              // 3 m there and back
@@ -498,6 +510,30 @@ static void console_run(char *line) {
     cJSON_Delete(params);
 }
 
+// USB diagnostics: ">cam" takes a photo and prints it as "@cam begin <bytes>",
+// base64 lines and "@cam end", or "@cam error <code>".
+static void console_photo(void) {
+    camera_frame_t frame;
+    esp_err_t err = camera_capture(&frame);
+    if (err != ESP_OK) {
+        printf("@cam error %s\n", esp_err_to_name(err));
+        fflush(stdout);
+        return;
+    }
+    printf("@cam begin %u %dx%d\n", (unsigned)frame.len, frame.width, frame.height);
+    for (size_t at = 0; at < frame.len; at += 48) {
+        unsigned char line[65];
+        size_t n = 0;
+        size_t chunk = frame.len - at < 48 ? frame.len - at : 48;
+        mbedtls_base64_encode(line, sizeof(line), &n, frame.jpeg + at, chunk);
+        line[n] = '\0';
+        printf("%s\n", line);
+    }
+    printf("@cam end\n");
+    fflush(stdout);
+    camera_release(&frame);
+}
+
 static void console_task(void *arg) {
     (void)arg;
     char line[256];
@@ -508,6 +544,7 @@ static void console_task(void *arg) {
         if (c == '\r' || c == '\n') {
             line[n] = '\0';
             if (!strncmp(line, ">car ", 5)) console_run(line + 5);
+            else if (!strcmp(line, ">cam")) console_photo();
             n = 0;
         } else if (n < sizeof(line) - 1) {
             line[n++] = (char)c;
@@ -545,6 +582,29 @@ bool freenove_car_init(void) {
     ESP_LOGI(TAG, "PCA9685 at 0x%02X: %s", PCA9685_ADDR,
              s_car.base_ok ? "ready, motors stopped" : "not answering");
     esp_register_shutdown_handler(car_shutdown);
+
+    // The camera's own SCCB bus; esp32-camera finds it by its port.
+    i2c_master_bus_config_t cam_bus = {
+        .i2c_port = I2C_NUM_1,
+        .sda_io_num = CAM_SDA,
+        .scl_io_num = CAM_SCL,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    i2c_master_bus_handle_t cam_i2c;
+    if (i2c_new_master_bus(&cam_bus, &cam_i2c) == ESP_OK) {
+        static const camera_dvp_config_t cam = {
+            .name = "the Freenove car's head camera",
+            .xclk = GPIO_NUM_21, .pclk = GPIO_NUM_22, .vsync = GPIO_NUM_25, .href = GPIO_NUM_23,
+            .d = { GPIO_NUM_4, GPIO_NUM_5, GPIO_NUM_18, GPIO_NUM_19,
+                   GPIO_NUM_36, GPIO_NUM_39, GPIO_NUM_34, GPIO_NUM_35 },
+            .i2c_port = I2C_NUM_1,
+        };
+        camera_register(camera_dvp(&cam));
+    } else {
+        ESP_LOGW(TAG, "camera bus did not start: no camera");
+    }
 
     gpio_config_t trig = { .pin_bit_mask = 1ULL << SONIC_TRIG, .mode = GPIO_MODE_OUTPUT };
     gpio_config(&trig);

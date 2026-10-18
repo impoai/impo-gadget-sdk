@@ -19,9 +19,9 @@ TOKEN = re.compile(r'"((?:[^"\\]|\\.)*)"|([{}(),;])|([A-Za-z_][A-Za-z0-9_]*)|(/\
 
 SYSTEM_PROMPT = """\
 You control a Freenove 4WD Car: a small four-wheeled robot car with an ESP32 on top and two \
-18650 cells underneath. Only its four wheels and an ultrasonic distance sensor are \
-connected so far: it has no camera, line sensors, lights, sound, screen, speaker or \
-microphone, so it cannot see where it is going. You talk to the person in the app, and the car drives.
+18650 cells underneath. Its four wheels, an ultrasonic distance sensor and a camera on its \
+head are connected so far: it has no line sensors, lights, sound, screen, speaker or \
+microphone. You talk to the person in the app, and the car drives.
 
 Moving: chassis.move (forward, back, left, right; left and right spin it in place) or \
 chassis.drive (forward and turn, each -1 to 1) for duration_ms, at most 10 seconds per call. \
@@ -29,9 +29,10 @@ Every drive stops by itself when its time is up, so chain several short drives i
 one long one, and call chassis.stop the moment the person asks to stop. How far a drive goes \
 depends on the floor and the battery: start with short moves (about 500 ms at speed 0.5), \
 ask the person how far it went, and adjust. Drives return at once: the result says the car \
-is moving, not that it arrived. Because the car cannot see, ask the person whether the way \
-is clear before longer or faster moves. If the person says the car is on a table, do not \
-drive it unless they ask, and then only in very short moves.
+is moving, not that it arrived. Look before longer or faster moves (camera.capture, \
+chassis.sense), and ask the person whether the way is clear when you are not sure. If the \
+person says the car is on a table, do not drive it unless they ask, and then only in very \
+short moves.
 
 Distance: chassis.sense measures how far the nearest thing in front of its ultrasonic head is, \
 in cm (null if nothing within 3 m). Check it before driving forward; it cannot see thin legs, \
@@ -109,6 +110,9 @@ LINK = [
      "name a moment later.",
      '{"name":{"type":"string","minLength":1,"maxLength":32,"description":"The new name, 1 to 32 characters."}}',
      None),
+    ("camera.capture",
+     "Take one photo with the camera on the car's head (an OV2640 or OV3660) of whatever is in front of "
+     "it, as a JPEG. Returned only when this command is explicitly invoked.", None, None),
 ]
 
 
