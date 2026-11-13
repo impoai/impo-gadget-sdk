@@ -428,6 +428,11 @@ The device still needs to be paired once for its token.
   delete the generated `sdkconfig` (or the whole build directory) and rebuild.
   `cmake/validate_config.cmake` stops the build if a stale config has the old
   TCP buffer sizes or cJSON nesting limit.
+- With `CONFIG_HOMEHUB_USB_HID` (the XIAO ESP32-S3), a `keyboard.type` or
+  `mouse.move` turns the USB port into a keyboard and mouse, and the serial
+  port disappears until `CONFIG_HOMEHUB_USB_HID_RELEASE_S` (60) seconds pass
+  without input. Wait for it to come back, or press RESET, before you flash
+  or monitor.
 - Edit per-build settings with `idf.py -B <dir> menuconfig` (under "ESP32
   Device SDK"). Don't commit a generated `sdkconfig`: it's gitignored for a reason.
 - OTA is off by default (`CONFIG_HOMEHUB_OTA_ENABLED=n`, version `999.0.0`),

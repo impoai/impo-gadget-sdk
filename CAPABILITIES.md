@@ -66,7 +66,7 @@ developer platform, not the firmware. The contract is
 `features` names what the fixed keys don't: a board lists its own in
 `impo_board_t.features`. Known values: `motion_sensor` (`imu.*`), `locomotion`
 (`chassis.*`), `lights` (lights the agent can set), `touch_pads`,
-`environment_sensors` (`sensors.read`).
+`environment_sensors` (`sensors.read`), `usb_hid` (`keyboard.*`, `mouse.*`).
 
 The Impo server shows `capabilities` with each gadget in
 `impo_list_gadgets`.
@@ -254,6 +254,23 @@ wired so far, so it registers `chassis.drive`, `move`, `stop` and `status`.
 | Command | Who has it | Parameters | Result payload |
 |---|---|---|---|
 | `sensors.read` | `environment_sensors` | — | CO₂, tVOC, temperature, humidity, each with its age; null when absent |
+
+### `keyboard.*` and `mouse.*` — the computer it's plugged into
+
+| Command | Who has it | Parameters | Result payload |
+|---|---|---|---|
+| `keyboard.type` | `usb_hid` | `text`: 1 to 500 characters, printable ASCII, `\n` for Enter and `\t` for Tab (`\r` is skipped) | `{"typed"}` |
+| `mouse.move` | `usb_hid` | `dx` right, `dy` down: whole numbers, −3000..3000 | `{"dx", "dy"}` |
+
+A gadget with `usb_hid` acts as a USB keyboard and mouse on the computer its
+own USB port is plugged into (`CONFIG_HOMEHUB_USB_HID`, `esp32/main/usb_hid.c`).
+Keys follow the US layout, and the computer's input source turns them into
+characters, so an input method catches them. A move is relative, and the
+computer's pointer speed decides how far it goes on screen. The first input
+after a pause plugs the keyboard in, about a second; until then, and again
+after a minute without input, the port is the serial console. Both fail with
+`no_computer` when nothing takes the keyboard, and with `busy` while earlier
+input is still being sent.
 
 ### `device.*` — the gadget itself
 

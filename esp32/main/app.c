@@ -80,6 +80,9 @@
 #if CONFIG_HOMEHUB_RETERMINAL_SHT4X
 #include "reterminal_sht4x.h"
 #endif
+#if CONFIG_HOMEHUB_USB_HID
+#include "usb_hid.h"
+#endif
 #if CONFIG_IMPO_CAMERA
 #include "impo_camera.h"
 #endif
@@ -2091,6 +2094,10 @@ static cJSON *on_ws_command(
     if (strcmp(command, "sensors.read") == 0) {
         return reterminal_sht4x_command();
     }
+#endif
+#if CONFIG_HOMEHUB_USB_HID
+    cJSON *hid_result = usb_hid_command(command, params, request_id, session_generation);
+    if (hid_result) return hid_result;
 #endif
     if (strcmp(command, "device.reset_vm") == 0) {
         return queue_ws_control(WS_CONTROL_RESET_VM, NULL);

@@ -1318,6 +1318,15 @@ static char *build_register_json(const uint8_t *handshake_hash,
     freenove_car_capabilities(params);
     cJSON_ReplaceItemInObject(params, "model_id", cJSON_CreateString("freenove-4wd-car"));
 #endif
+#if CONFIG_HOMEHUB_USB_HID
+    {
+        cJSON *caps = cJSON_GetObjectItem(params, "capabilities");
+        if (!caps) caps = cJSON_AddObjectToObject(params, "capabilities");
+        cJSON *features = cJSON_GetObjectItem(caps, "features");
+        if (!features) features = cJSON_AddArrayToObject(caps, "features");
+        cJSON_AddItemToArray(features, cJSON_CreateString("usb_hid"));
+    }
+#endif
 #if CONFIG_HOMEHUB_LED_BACKEND_XTEINK_X4
     cJSON *caps = cJSON_AddObjectToObject(params, "capabilities");
     cJSON_AddItemToObject(caps, "screen", display_canvas_info());
@@ -1500,6 +1509,40 @@ static char *build_register_json(const uint8_t *handshake_hash,
                 "and relative humidity in percent. Each reading has its age "
                 "in seconds; a sensor with no recent reading is null.",
                 nullptr, nullptr);
+#endif
+
+#if CONFIG_HOMEHUB_USB_HID
+    {
+        cJSON *type_required = cJSON_CreateObject();
+        cJSON_AddItemToObject(type_required, "text", string_param(
+            "1 to 500 characters of printable ASCII; \\n presses Enter and \\t Tab."));
+        add_command(commands, "keyboard.type",
+                    "Type text on the computer this gadget's USB port is plugged into, as a "
+                    "US keyboard, into whatever has focus there. You can't see that screen, so "
+                    "ask the person to put the cursor where the text should go. The computer's "
+                    "input source applies: with a Chinese input method on, the keys go to it. "
+                    "The first input after a pause takes a second or two longer. Returns how "
+                    "many characters were typed.",
+                    type_required, nullptr);
+
+        cJSON *move_required = cJSON_CreateObject();
+        const char *axes[][2] = {
+            {"dx", "Right, negative for left: -3000 to 3000."},
+            {"dy", "Down, negative for up: -3000 to 3000."},
+        };
+        for (const auto &axis : axes) {
+            cJSON *param = cJSON_CreateObject();
+            cJSON_AddStringToObject(param, "type", "integer");
+            cJSON_AddStringToObject(param, "description", axis[1]);
+            cJSON_AddItemToObject(move_required, axis[0], param);
+        }
+        add_command(commands, "mouse.move",
+                    "Move the pointer on the computer this gadget's USB port is plugged into, "
+                    "from where it is: dx to the right and dy down. The computer's pointer "
+                    "speed decides how far that goes on screen, and you can't see it, so move "
+                    "in steps and ask the person. It doesn't click.",
+                    move_required, nullptr);
+    }
 #endif
 
 #if CONFIG_IMPO_CAMERA

@@ -173,7 +173,7 @@ status screen.
 | ESP32-C5 DevKitC-1 | Status light and button | `idf.py build` |
 | ESP32-C6 devkit without PSRAM | Status light and button | `tools/board.sh c6-nopsram build` |
 | Espressif ESP32-S3-DevKitC-1 | Status light and button | `tools/board.sh espressif-s3-devkitc-1 build` |
-| Seeed XIAO ESP32-S3 | Button; no status light, so follow setup in the app | `tools/board.sh seeed-xiao-esp32s3 build` |
+| Seeed XIAO ESP32-S3 | Button, and a USB keyboard and mouse for the computer it's plugged into; no status light, so follow setup in the app | `tools/board.sh seeed-xiao-esp32s3 build` |
 | ideaspark ESP32 with 1.9" display | Status on screen, images | `tools/board.sh ideaspark build` |
 | Waveshare ESP32-C6-LCD-1.47 | Status on screen, images | `tools/board.sh waveshare-c6-lcd-147 build` |
 | Seeed SenseCAP Indicator | Status on a 4" screen, images | `tools/board.sh sensecap-indicator build` |

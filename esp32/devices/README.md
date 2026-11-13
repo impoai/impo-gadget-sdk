@@ -78,6 +78,7 @@ session to Impo. The rest depends on the hardware.
 | Battery status | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Voltage only | — | — | ✅ | ✅ | ✅ | Voltage only | — | — | Percent only | — | No charging state | — | No charging state | — |
 | Over-the-air updates | Off | Off | Off | Off | Off | Off | Off | Off | Off | On | On | On | On | On | On | On | On | On | On | Off | On | On | On | On | On | Off | On | On | On | Off | Off | Off | Off |
 | Buttons | BOOT | BOOT | BOOT | BOOT | Top | Green | Green | Centre (talk), dial | XIAO BOOT (talk/setup) | PWR (talk), BOOT | BOOT (talk), PWR | BOOT, PWR (talk), KEY (talk) on top | Top pad (talk), side pads (menu), BOOT (talk) | Two | BOOT (talk), PWR | BOOT (talk), PWR | Wheel (press to talk, turn to sleep) | Front (talk), side (menu), PWR | Front (talk), side (menu), PWR | GO/Space (talk), Esc/Enter/arrows (menu) | BOOT/CONFIG (talk) | Yellow (talk), blue (sleep), PWR | PWR (talk), RST | Touch BtnB (talk), PWR | BOOT (talk) | BOOT | BOOT (talk) | BOOT (talk), Vol+/Vol- (menu) | BOOT (flash only) | OK (talk), UP/DOWN (menu) | Confirm (setup) | BOOT (setup) | BOOT (setup) |
+| USB keyboard and mouse | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | ✅ |
 Boards without PSRAM (the ideaspark, the C6 boards, the Cardputer ADV and the AI Passport) don't have room for
 the home-network tunnel. Impo can still reach and control them once the
 control session is up. The Waveshare C6, Cardputer ADV and AI Passport also can't hold their own voice
@@ -438,6 +439,14 @@ flashing port; the first flash replaces Seeed's factory firmware.
   starting`, then BLE advertising as `ImpoGadget-XXXXXX`.
 - BOOT is the setup button: press it when the app asks you to confirm
   pairing, and hold it for 5 seconds to reset setup. RESET restarts the board.
+- Impo can type and move the pointer on the computer the USB-C port is
+  plugged into (`keyboard.type`, `mouse.move`): the port then acts as a USB
+  keyboard and mouse. Keys follow the US layout, so switch the computer to an
+  English input source first; an input method such as Pinyin catches them.
+  On a Mac, Keyboard Setup Assistant opens the first time: close it.
+- While it's a keyboard, the serial port is gone. It comes back after a
+  minute without input (`CONFIG_HOMEHUB_USB_HID_RELEASE_S`), or when you press
+  RESET.
 - Attach the U.FL antenna that comes with the board. Wi-Fi and BLE are weak
   without it, and Wi-Fi must be 2.4 GHz.
 - If flashing can't connect, hold BOOT, press RESET, release BOOT, and flash

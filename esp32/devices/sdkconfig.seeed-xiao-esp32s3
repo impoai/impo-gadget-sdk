@@ -39,6 +39,12 @@ CONFIG_SPIRAM_SPEED_80M=y
 # The board has no USB-UART bridge: the console is the USB-C port.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
+# The USB-C port also acts as a USB keyboard and mouse for Impo
+# (keyboard.type, mouse.move): from the first such command until a minute
+# without input, the console is off. See main/usb_hid.c.
+CONFIG_HOMEHUB_USB_HID=y
+CONFIG_TINYUSB_HID_COUNT=1
+
 # The BLE controller already takes ~70 KB of internal RAM on the S3; keep the
 # NimBLE host's allocations in PSRAM so pairing has room.
 CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y

@@ -326,6 +326,36 @@ menu "ESP32 Device SDK"
             tenths of a degree Celsius. The onboard sensor reads warm from
             board heat; -33 (-3.3 C, about -6 F) is a starting point.
 
+    config HOMEHUB_USB_HID
+        bool "USB keyboard and mouse (keyboard.type, mouse.move)"
+        depends on SOC_USB_OTG_SUPPORTED
+        default n
+        help
+            Let Impo type text and move the pointer on the computer that the
+            chip's own USB port is plugged into (usb_hid.c). The port is the
+            serial console until the first keyboard.type or mouse.move. Then
+            it becomes a USB keyboard and mouse, and the console stops until
+            HOMEHUB_USB_HID_RELEASE_S seconds pass without input. Key presses
+            follow the US layout. Needs CONFIG_TINYUSB_HID_COUNT=1, and a USB
+            port wired to the chip, not to a USB-UART bridge.
+
+    config HOMEHUB_USB_HID_RELEASE_S
+        int "Seconds without input before the USB port is the console again"
+        depends on HOMEHUB_USB_HID
+        range 0 3600
+        default 60
+        help
+            After this long without keyboard.type or mouse.move, the USB port
+            goes back to the serial console, so logs and flashing work again.
+            0 keeps the keyboard and mouse until the board restarts.
+
+    # Always defined, unlike a bool that is off, so idf_component.yml's rule
+    # can pull in esp_tinyusb only where the keyboard and mouse are on.
+    config HOMEHUB_USB_HID_DRIVER
+        string
+        default "tinyusb" if HOMEHUB_USB_HID
+        default "none"
+
     config HOMEHUB_DISPLAY_COMMANDS
         bool
         default y if HOMEHUB_DISPLAY

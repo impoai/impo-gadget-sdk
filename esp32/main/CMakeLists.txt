@@ -97,6 +97,10 @@ if(CONFIG_HOMEHUB_LED_BACKEND_FREENOVE_4WD_CAR)
     list(APPEND GADGET_SRCS "freenove_4wd_car.c")
 endif()
 
+if(CONFIG_HOMEHUB_USB_HID)
+    list(APPEND GADGET_SRCS "usb_hid.c")
+endif()
+
 if(CONFIG_HOMEHUB_SENSECAP_SENSORS)
     list(APPEND GADGET_SRCS "sensecap_sensors.c")
 endif()

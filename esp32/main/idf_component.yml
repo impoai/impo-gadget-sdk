@@ -16,5 +16,10 @@ dependencies:
   espressif/esp_websocket_client: "~1.2"
   espressif/cjson: "~1.7"
   espressif/led_strip: "~3.0"
+  # The USB keyboard and mouse (usb_hid.c), only where they're on.
+  espressif/esp_tinyusb:
+    version: "~2.4.0"
+    rules:
+      - if: "$CONFIG{HOMEHUB_USB_HID_DRIVER} == \"tinyusb\""
   idf:
     version: ">=5.1"
