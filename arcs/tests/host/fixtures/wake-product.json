@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "mini-wake-test",
+  "display_name": "ARCS Mini",
+  "screen_title": "ARCS Mini",
+  "model_id": "arcs-mini-voice",
+  "node_prefix": "arcs-mini",
+  "product_id": null,
+  "continuous_dialogue": true,
+  "china_relay": true,
+  "wake": {
+    "enabled": true,
+    "bundle": "wake.json"
+  }
+}

@@ -73,6 +73,9 @@ int plat_audio_write(const int16_t *pcm, size_t samples);   /* blocks while the 
 typedef void (*plat_audio_mic_cb_t)(const int16_t *pcm, size_t samples);
 int plat_audio_mic_start(plat_audio_mic_cb_t cb);
 void plat_audio_mic_stop(void);
+/* Idle-only microphone owner. Voice capture takes exclusive callback priority. */
+int plat_audio_wake_start(plat_audio_mic_cb_t cb);
+void plat_audio_wake_stop(void);
 void plat_audio_mic_stereo(bool on);   /* debug: interleaved L/R (R carries the speaker reference) */
 
 /* ---- Wall clock (SNTP). TLS certificate checks need it. ---- */
@@ -89,6 +92,9 @@ int plat_random(void *buf, size_t len);
 typedef struct plat_tls plat_tls_t;
 /* Returns NULL on failure; *err (optional) gets the mbedtls or socket error. */
 plat_tls_t *plat_tls_connect(const char *host, uint16_t port, uint32_t timeout_ms, int *err);
+/* Dial host:port, but authenticate tls_name (NULL uses host), including SNI. */
+plat_tls_t *plat_tls_connect_named(const char *host, uint16_t port, const char *tls_name,
+                                   uint32_t timeout_ms, int *err);
 int plat_tls_write(plat_tls_t *tls, const void *buf, size_t len);   /* writes all, returns len or <0 */
 /* >0 bytes read, 0 peer closed, PLAT_TLS_TIMEOUT, <0 error. */
 int plat_tls_read(plat_tls_t *tls, void *buf, size_t len, uint32_t timeout_ms);

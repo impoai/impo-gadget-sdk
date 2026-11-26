@@ -14,6 +14,7 @@
 #include "net_al.h"
 #include "net_def.h"
 #include "lisa_wifi.h"
+#include "lisa_kv.h"
 #include "mac_manager.h"
 #include "mac_manager_ops.h"
 #include "wifi_manager/wifi_manager.h"
@@ -22,6 +23,7 @@
 #include "shell.h"
 
 #include "platform_arcs.h"
+#include "impo_cloud_route.h"
 
 #define TAG "plat_wifi"
 #include "lisa_log.h"
@@ -44,6 +46,9 @@ static void dhcp_status_cb(int vif_idx, bool success, uint32_t ip, uint32_t mask
         return;
     }
     if (success) {
+        if (s_wifi.ip != ip) {
+            impo_cloud_route_reset(); /* Atomic only; /where runs in the requesting task. */
+        }
         s_wifi.ip = ip;
         LISA_LOGI(TAG, "got ip %u.%u.%u.%u gw %u.%u.%u.%u",
                   ip & 0xff, (ip >> 8) & 0xff, (ip >> 16) & 0xff, ip >> 24,
@@ -126,6 +131,37 @@ static int sta_connect_any_router(wifi_mgr_wifi_sta_config_t *cfg, uint32_t time
     return s_sta_connect(&any, timeout_ms);
 }
 
+/* Keep an explicitly chosen network across reboot. The SDK's normal selector
+ * otherwise ranks every saved network by RSSI, including an older network.
+ * Passwords remain solely in the official Wi-Fi manager storage. */
+#define KV_PREFERRED_WIFI "impo.wifi_pref"
+static void preferred_boot_task(void *arg)
+{
+    (void)arg;
+    /* Let the main task finish USB/UI bring-up before entering the SDK's
+     * synchronous storage/connect path. */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    char *ssid = NULL;
+    wifi_mgr_sta_config_t cfg = {0};
+    if (lisa_kv_get_string(KV_PREFERRED_WIFI, &ssid) == 0 && ssid &&
+        strlen(ssid) > 0 && strlen(ssid) <= 32 &&
+        wifi_mgr_storage_search_ap(&cfg, 1, SEARCH_BY_SSID, ssid) > 0) {
+        cfg.bssid[0] = 0; cfg.channel = 0;
+        int ret = wifi_mgr_sta_connect(&cfg, false);
+        for (unsigned ms = 0; ret == 0 && !s_wifi.ip && ms < 8000; ms += 200)
+            vTaskDelay(pdMS_TO_TICKS(200));
+        LISA_LOGI(TAG, "preferred saved network attempt: %d, ip=%u", ret, (unsigned)(s_wifi.ip != 0));
+    }
+    if (ssid) lisa_kv_free(ssid);
+    wifi_mgr_autoconn_config_t autoconn = { .interval_ms = AUTO_CONNECT_INTERVAL_MS };
+    wifi_mgr_auto_connect_start(&autoconn);
+#if INCLUDE_uxTaskGetStackHighWaterMark == 1
+    LISA_LOGI(TAG, "preferred task minimum free stack: %u bytes",
+              (unsigned)(uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t)));
+#endif
+    vTaskDelete(NULL);
+}
+
 static void wifi_init_done(void)
 {
     wifi_mgr_ops_t *ops = wifi_mgr_ops_get();
@@ -143,8 +179,10 @@ static void wifi_init_done(void)
     }
 
     save_build_time_network();
-    wifi_mgr_autoconn_config_t autoconn = { .interval_ms = AUTO_CONNECT_INTERVAL_MS };
-    wifi_mgr_auto_connect_start(&autoconn);
+    if (xTaskCreate(preferred_boot_task, "wifi_preferred", 8192 / sizeof(StackType_t), NULL, 2, NULL) != pdPASS) {
+        wifi_mgr_autoconn_config_t autoconn = { .interval_ms = AUTO_CONNECT_INTERVAL_MS };
+        wifi_mgr_auto_connect_start(&autoconn);
+    }
     LISA_LOGI(TAG, "station started");
 }
 
@@ -277,6 +315,7 @@ int plat_wifi_join(const char *ssid, const char *password, uint32_t timeout_ms)
     if (s_wifi.ip != 0 && wifi_mgr_sta_get_connected_info(&cur) == 0 && strncmp(cur.ssid, ssid, 32) == 0 &&
         strcmp(cur.pwd, password) == 0) {
         LISA_LOGI(TAG, "join %s: already connected", ssid);
+        lisa_kv_set_string(KV_PREFERRED_WIFI, ssid);
         return 0;
     }
 
@@ -296,9 +335,12 @@ int plat_wifi_join(const char *ssid, const char *password, uint32_t timeout_ms)
         vTaskDelay(pdMS_TO_TICKS(200));
         waited += 200;
     }
-    bool ok = s_wifi.ip != 0;
+    wifi_mgr_sta_config_t verified = {0};
+    bool ok = s_wifi.ip != 0 && wifi_mgr_sta_get_connected_info(&verified) == 0 &&
+              strncmp(verified.ssid, ssid, 32) == 0;
     if (ok) {
         wifi_mgr_storage_save_ap(&cfg);
+        lisa_kv_set_string(KV_PREFERRED_WIFI, ssid);
     }
     wifi_mgr_autoconn_config_t autoconn = { .interval_ms = AUTO_CONNECT_INTERVAL_MS };
     wifi_mgr_auto_connect_start(&autoconn);
@@ -310,12 +352,8 @@ static int wifi_cmd(int argc, char **argv)
 {
     uint32_t ip = s_wifi.ip;
     if (argc >= 4 && strcmp(argv[1], "connect") == 0) {
-        wifi_mgr_sta_config_t cfg = {0};
-        strncpy(cfg.ssid, argv[2], sizeof(cfg.ssid) - 1);
-        strncpy(cfg.pwd, argv[3], sizeof(cfg.pwd) - 1);
-        cfg.encryption_mode = WIFI_MGR_WIFI_AUTH_AUTO;
-        wifi_mgr_storage_save_ap(&cfg);
-        shellPrint(shellGetCurrent(), "connect %s: %d\n", cfg.ssid, wifi_mgr_sta_connect(&cfg, true));
+        int ret = plat_wifi_join(argv[2], argv[3], 30000);
+        shellPrint(shellGetCurrent(), "network join: %d; preference saved only on success\n", ret);
         return 0;
     }
     shellPrint(shellGetCurrent(), "ready=%d associated=%d ip=%u.%u.%u.%u last_reason=%d\n",

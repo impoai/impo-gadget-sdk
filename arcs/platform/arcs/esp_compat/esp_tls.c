@@ -86,7 +86,7 @@ int esp_tls_conn_new_sync(const char *hostname, int hostlen, int port, const esp
     esp_compat_wdt_alive("tls_connect");
     int err = 0;
     uint32_t timeout = cfg != NULL && cfg->timeout_ms > 0 ? (uint32_t)cfg->timeout_ms : 10000;
-    tls->conn = plat_tls_connect(host, (uint16_t)port, timeout, &err);
+    tls->conn = plat_tls_connect_named(host, (uint16_t)port, cfg ? cfg->common_name : NULL, timeout, &err);
     esp_compat_wdt_alive("tls_connected");
     if (tls->conn == NULL) {
         snprintf(s_last_event, sizeof(s_last_event), "tls connect -0x%04x", err < 0 ? -err : err);

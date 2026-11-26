@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+if(NOT IMPO_PRODUCT_DIR OR NOT EXISTS "${IMPO_PRODUCT_DIR}/impo_product_config.h")
+    message(FATAL_ERROR "Select BOARD=arcs_mini_voice in the official arcs/app project")
+endif()
+listenai_library_named(impo_arcs_mini)
+listenai_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${IMPO_PRODUCT_DIR})
+listenai_library_sources(src/impo_arcs_mini.c src/impo_arcs_wake_resources.c)
+if(IMPO_APP_DIR)
+    add_subdirectory(${IMPO_APP_DIR} ${CMAKE_BINARY_DIR}/impo_application)
+else()
+    listenai_library_sources(src/default_app.c)
+endif()

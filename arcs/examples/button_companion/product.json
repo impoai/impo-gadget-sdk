@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "mini-companion",
+  "display_name": "Mini",
+  "model_id": "arcs-mini-companion",
+  "node_prefix": "mini",
+  "product_id": null,
+  "continuous_dialogue": true,
+  "china_relay": true,
+  "wake": {"enabled": false}
+}

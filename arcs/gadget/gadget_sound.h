@@ -24,6 +24,8 @@ int gadget_sound_start(void (*set_amp)(bool on));
 
 /* Starts a new sound, dropping the current one. Returns its generation for write/end. */
 uint32_t gadget_sound_begin(const char *what);
+/* Buffer network speech until complete, or the existing ring is nearly full. */
+uint32_t gadget_sound_begin_buffered(const char *what);
 /* Queues 16 kHz mono samples, waiting up to timeout_ms for room. 0 ok, -1 replaced or stopped, -2 timeout. */
 int gadget_sound_write(uint32_t gen, const int16_t *pcm, size_t samples, uint32_t timeout_ms);
 /* No more samples for this sound; error (or NULL) says why it ended early. */

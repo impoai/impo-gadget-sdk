@@ -27,6 +27,7 @@
 
 #define RATE            GADGET_SOUND_RATE
 #define RING_SAMPLES    (RATE * 30)     /* 30 s, 960 KB of PSRAM: a long reply never stalls the link */
+#define PREFILL_SAMPLES (RATE * 25)     /* leave 5 s free so long replies cannot deadlock */
 #define BLOCK           256             /* one DMA buffer, 16 ms */
 #define AMP_OFF_MS      1000
 #define AMP_ON_SETTLE_MS 20
@@ -40,6 +41,7 @@ static TaskHandle_t s_task;
 static volatile uint32_t s_gen;            /* bumped by begin/stop: older producers give up */
 static volatile gadget_sound_state_t s_state = GADGET_SOUND_IDLE;
 static volatile bool s_input_done = true;
+static volatile bool s_buffering;
 static char s_error[48];
 static int s_volume = DEFAULT_VOLUME;
 static int32_t s_gain_q15;
@@ -85,11 +87,19 @@ uint32_t gadget_sound_begin(const char *what)
 {
     ring_clear();
     s_gen++;
+    s_buffering = false;
     s_input_done = false;
     s_error[0] = '\0';
     s_state = GADGET_SOUND_FETCHING;
     LISA_LOGI(TAG, "begin %s", what);
     return s_gen;
+}
+
+uint32_t gadget_sound_begin_buffered(const char *what)
+{
+    uint32_t gen = gadget_sound_begin(what);
+    s_buffering = true;
+    return gen;
 }
 
 int gadget_sound_write(uint32_t gen, const int16_t *pcm, size_t samples, uint32_t timeout_ms)
@@ -108,7 +118,7 @@ int gadget_sound_write(uint32_t gen, const int16_t *pcm, size_t samples, uint32_
         }
         s_count += n;
         xSemaphoreGive(s_lock);
-        if (n > 0 && (s_state == GADGET_SOUND_FETCHING || s_state == GADGET_SOUND_DECODING)) {
+        if (n > 0 && !s_buffering && (s_state == GADGET_SOUND_FETCHING || s_state == GADGET_SOUND_DECODING)) {
             s_state = GADGET_SOUND_PLAYING;
         }
         pcm += n;
@@ -129,14 +139,19 @@ void gadget_sound_end(uint32_t gen, const char *error)
     if (gen != s_gen) {
         return;
     }
-    s_input_done = true;
     if (error != NULL) {
+        /* Never speak a truncated phrase that has not started playing yet. */
+        if (s_buffering) {
+            ring_clear();
+            s_buffering = false;
+        }
         snprintf(s_error, sizeof(s_error), "%s", error);
         if (s_count == 0) {
             s_state = GADGET_SOUND_FAILED;
         }
         LISA_LOGW(TAG, "sound failed: %s", error);
     }
+    s_input_done = true;
 }
 
 void gadget_sound_set_decoding(uint32_t gen)
@@ -149,6 +164,7 @@ void gadget_sound_set_decoding(uint32_t gen)
 void gadget_sound_stop(void)
 {
     s_gen++;
+    s_buffering = false;
     ring_clear();
     s_input_done = true;
     s_state = GADGET_SOUND_IDLE;
@@ -229,6 +245,18 @@ static void out_task(void *arg)
     bool played = false;
     for (;;) {
         plat_watchdog_checkin(wd);
+        /* Keep the current 30 s PSRAM ring; do not increase internal SRAM. */
+        if (s_buffering && !s_input_done && s_count < PREFILL_SAMPLES) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            continue;
+        }
+        if (s_buffering) {
+            s_buffering = false;
+            if (s_count > 0) {
+                s_state = GADGET_SOUND_PLAYING;
+                LISA_LOGI(TAG, "speech buffer ready: %u ms", (unsigned)(s_count * 1000 / RATE));
+            }
+        }
         size_t n = ring_take(block, BLOCK);
         if (n == 0) {
             if (played) {

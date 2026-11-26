@@ -31,7 +31,7 @@
 /* Body bytes per noise_ctrl_req_send: well inside a session built for Impo on Link's
  * session (its outbound scratch is 6 KB, its request queue holds 4 KB). */
 #define CHUNK_MAX 2048
-#define SEND_WAIT_MS 5000
+#define SEND_WAIT_MS 20000
 
 typedef struct {
     bool used;
@@ -100,14 +100,24 @@ static void on_frame(void *ctx, int status, const uint8_t *data, size_t len, boo
 
 static bool send_body(int64_t id, const uint8_t *data, size_t len, bool end)
 {
+    size_t total = len;
+    uint64_t started = plat_uptime_ms();
     do {
         size_t n = len > CHUNK_MAX ? CHUNK_MAX : len;
-        if (!noise_ctrl_req_send(id, data, n, end && n == len, SEND_WAIT_MS)) {
+        uint64_t waited = plat_uptime_ms() - started;
+        uint32_t wait_ms = waited < SEND_WAIT_MS ? SEND_WAIT_MS - (uint32_t)waited : 0;
+        if (!noise_ctrl_req_send(id, data, n, end && n == len, wait_ms)) {
+            LISA_LOGW(TAG, "body queue failed: %u/%u bytes accepted in %u ms", (unsigned)(total - len),
+                      (unsigned)total, (unsigned)(plat_uptime_ms() - started));
             return false;
         }
         data += n;
         len -= n;
     } while (len > 0);
+    uint64_t elapsed = plat_uptime_ms() - started;
+    if (elapsed >= 500) {
+        LISA_LOGI(TAG, "body queued: %u bytes in %u ms", (unsigned)total, (unsigned)elapsed);
+    }
     return true;
 }
 

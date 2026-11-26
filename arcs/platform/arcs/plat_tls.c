@@ -7,6 +7,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "lwip/sockets.h"
+#include "sal_socket.h"
+
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/error.h"
@@ -89,6 +92,18 @@ static int load_ca(void)
     return ret;
 }
 
+/* A WS header and its masked payload are separate TLS records. Do not make
+ * small records wait for Nagle plus a remote delayed ACK on a high-RTT path. */
+static void tune_tcp(mbedtls_net_context *net)
+{
+    int enabled = 1;
+    if (sal_setsockopt(net->fd, IPPROTO_TCP, TCP_NODELAY, &enabled, sizeof(enabled)) != 0) {
+        LISA_LOGW(TAG, "TCP_NODELAY unavailable (errno %d)", errno);
+    } else {
+        LISA_LOGI(TAG, "TCP_NODELAY enabled");
+    }
+}
+
 static void log_error(const char *what, int ret)
 {
     char msg[96];
@@ -97,6 +112,12 @@ static void log_error(const char *what, int ret)
 }
 
 plat_tls_t *plat_tls_connect(const char *host, uint16_t port, uint32_t timeout_ms, int *err)
+{
+    return plat_tls_connect_named(host, port, NULL, timeout_ms, err);
+}
+
+plat_tls_t *plat_tls_connect_named(const char *host, uint16_t port, const char *tls_name,
+                                   uint32_t timeout_ms, int *err)
 {
     int ret;
     if (err != NULL) {
@@ -142,6 +163,7 @@ plat_tls_t *plat_tls_connect(const char *host, uint16_t port, uint32_t timeout_m
         log_error("tcp connect", ret);
         goto fail;
     }
+    tune_tcp(&t->net);
     if ((ret = mbedtls_net_set_nonblock(&t->net)) != 0) {
         LISA_LOGE(TAG, "set nonblock: %d", ret);
         goto fail;
@@ -158,7 +180,7 @@ plat_tls_t *plat_tls_connect(const char *host, uint16_t port, uint32_t timeout_m
     mbedtls_ssl_conf_read_timeout(&t->conf, timeout_ms);
 
     if ((ret = mbedtls_ssl_setup(&t->ssl, &t->conf)) != 0 ||
-        (ret = mbedtls_ssl_set_hostname(&t->ssl, host)) != 0) {
+        (ret = mbedtls_ssl_set_hostname(&t->ssl, tls_name ? tls_name : host)) != 0) {
         log_error("setup", ret);
         goto fail;
     }
@@ -218,17 +240,31 @@ int plat_tls_write(plat_tls_t *t, const void *buf, size_t len)
         p += ret;
         left -= (size_t)ret;
     }
+    uint64_t elapsed = plat_uptime_ms() - start;
+    if (elapsed >= 250) {
+        LISA_LOGW(TAG, "slow write: %u bytes in %u ms", (unsigned)len, (unsigned)elapsed);
+    }
     return (int)len;
 }
 
 int plat_tls_read(plat_tls_t *t, void *buf, size_t len, uint32_t timeout_ms)
 {
-    mbedtls_ssl_conf_read_timeout(&t->conf, timeout_ms);
+    uint64_t start = plat_uptime_ms();
     for (;;) {
+        uint64_t elapsed = plat_uptime_ms() - start;
+        if (timeout_ms > 0 && elapsed >= timeout_ms) {
+            return PLAT_TLS_TIMEOUT;
+        }
+        mbedtls_ssl_conf_read_timeout(&t->conf, timeout_ms > 0 ? timeout_ms - (uint32_t)elapsed : 0);
         int ret = mbedtls_ssl_read(&t->ssl, buf, len);
         if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
-            /* A record that needs more bytes; the next read waits for them with the timeout. */
-            vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+            /* Return control to the shared session so it can drain its TX queue. */
+            elapsed = plat_uptime_ms() - start;
+            if (timeout_ms == 0 || elapsed >= timeout_ms) {
+                return PLAT_TLS_TIMEOUT;
+            }
+            uint32_t left = timeout_ms - (uint32_t)elapsed;
+            vTaskDelay(pdMS_TO_TICKS(left < POLL_MS ? left : POLL_MS));
             continue;
         }
         if (ret == MBEDTLS_ERR_SSL_TIMEOUT) {

@@ -15,6 +15,9 @@ extern "C" {
 /* An Impo build: request streams (noise_ctrl_req_*), impo_commands_describe/
  * capabilities and impo_state_power(), bridged to gadget/ in link/impo_glue_commands.c. */
 #define CONFIG_IMPO_ENABLED 1
+#include <stdbool.h>
+bool gadget_voice_wakeup_available(void);
+#define NOISE_CTRL_WAKEUP_SUPPORTED gadget_voice_wakeup_available()
 
 /*
  * CONFIG_SPIRAM stays unset although every ARCS board has PSRAM. It selects

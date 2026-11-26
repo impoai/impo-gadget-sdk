@@ -26,3 +26,10 @@ included.
 Both the MIT and Apache-2.0 portions permit commercial use and hosting under
 their respective terms. The Gadget SDK is not subject to the Impo platform's
 Elastic License hosted-service restriction.
+
+ARCS Mini device adaptation (arcs/boards/arcs_mini_voice) and reusable SDK
+(arcs/components/impo_arcs_mini): new sources are MIT licensed. ListenAI board
+scaffolding retains its Apache-2.0 headers. ARCS Mini Status 24 bitmap glyphs
+derive from Noto Sans SC (Google Fonts), Copyright 2014-2021 Adobe, Reserved
+Font Name 'Source'. Glyphs are OFL-1.1; see
+arcs/boards/arcs_mini_voice/LICENSE-OFL. The original font is not bundled.

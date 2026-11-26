@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,12 @@ typedef enum {
 int gadget_voice_start(void);
 /* Idle: start listening. Listening: stop now. Replying: interrupt and listen again. Any task. */
 void gadget_voice_trigger(void);
+/* Board opt-in. A successful answer starts another turn; silence or a click exits. */
+void gadget_voice_set_continuous(bool enabled);
+bool gadget_voice_continuous_active(void);
+void gadget_voice_wake(void);
+void gadget_voice_set_wakeup_available(bool available);
+bool gadget_voice_wakeup_available(void);
 gadget_voice_state_t gadget_voice_state(void);
 
 /* Self-test: one turn in which the gadget speaks `text` (via /tts) into its own microphone. */

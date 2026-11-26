@@ -67,6 +67,11 @@ extern "C" {
 #endif
 }
 
+/* Platforms with a local wake engine may expose its runtime readiness. */
+#ifndef NOISE_CTRL_WAKEUP_SUPPORTED
+#define NOISE_CTRL_WAKEUP_SUPPORTED false
+#endif
+
 #include <xplat/noise/core/ClientSession.h>
 #include <xplat/noise/core/PsaCryptoBackend.h>
 #include <xplat/noise/core/ServiceCodec.h>
@@ -1352,7 +1357,7 @@ static char *build_register_json(const uint8_t *handshake_hash,
     cJSON_AddStringToObject(params, "version", desc ? desc->version : "unknown");
     cJSON_AddStringToObject(params, "device_family", NOISE_CTRL_DEVICE_FAMILY);
     cJSON_AddStringToObject(params, "model_id", NOISE_CTRL_MODEL_ID);
-    cJSON_AddBoolToObject(params, "is_wakeup_supported", false);
+    cJSON_AddBoolToObject(params, "is_wakeup_supported", NOISE_CTRL_WAKEUP_SUPPORTED);
     cJSON *metadata = nullptr;
     add_register_metadata_string(&metadata, params, "network_ssid", wifi_ssid);
     // An official unit proves who it is (contracts/gadget-identity.md in

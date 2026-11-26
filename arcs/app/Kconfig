@@ -1,4 +1,5 @@
 osource "$ARCS_BASE/Kconfig"
+rsource "../../esp32/components/impo_cloud_route/Kconfig"
 
 menu "Impo Gadget"
 

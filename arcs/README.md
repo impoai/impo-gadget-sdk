@@ -11,7 +11,11 @@ gadget the same base (network, link, voice, speaker, standard commands,
 power and status policy), and each piece of hardware is **one board file**
 filling `gadget_board_t`. See `docs/BOARD_INTERFACE.md`.
 
-First board: ARCS-MINI V2.1 robot dog (`boards/arcs_mini_v2_1`).
+Boards:
+- ARCS-MINI V2.1 robot dog (`boards/arcs_mini_v2_1`).
+- [ARCS Mini single-screen voice device](boards/arcs_mini_voice/README.md)
+  (`boards/arcs_mini_voice`), with a [product/application SDK](docs/ARCS_MINI_SDK.md)
+  for identity, continuous dialogue and optional local wake resources.
 
 ## Layers
 
@@ -23,6 +27,12 @@ First board: ARCS-MINI V2.1 robot dog (`boards/arcs_mini_v2_1`).
 | SDK | `gadget/` | the board interface, standard commands, speaker (`say`, `play_url`, beep, volume), voice turns, status light and battery policy, buttons |
 | features | `features/pairing` | Impo BLE setup protocol v5 (community mode) |
 | board | `boards/<board>/gadget` | one board file plus the drivers only that hardware has |
+
+## Cloud routing
+
+ARCS uses the shared official mainland route policy, enabled by
+`CONFIG_IMPO_CHINA_RELAY`. See [cloud routing](docs/CLOUD_ROUTE.md) for TLS
+identity, direct fallback, host tests and the physical validation limits.
 
 ## What the robot dog does (CAPABILITIES.md)
 

@@ -13,6 +13,8 @@
 
 struct esp_http_client {
     char url[512];
+    char common_name[128];
+    uint32_t timeout_ms;
     esp_http_client_method_t method;
     http_event_handle_cb handler;
     void *user_data;
@@ -50,6 +52,12 @@ esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *co
         free(c);
         return NULL;
     }
+    if (config->common_name != NULL &&
+        (size_t)snprintf(c->common_name, sizeof(c->common_name), "%s", config->common_name) >= sizeof(c->common_name)) {
+        free(c);
+        return NULL;
+    }
+    c->timeout_ms = config->timeout_ms > 0 ? (uint32_t)config->timeout_ms : 10000;
     c->method = config->method;
     c->handler = config->event_handler;
     c->user_data = config->user_data;
@@ -161,8 +169,9 @@ esp_err_t esp_http_client_perform(esp_http_client_handle_t c)
             return ESP_ERR_NO_MEM;
         }
         http_response_t resp;
-        int r = http_request(c->method == HTTP_METHOD_POST ? "POST" : "GET", c->url, headers, c->post,
-                             (size_t)c->post_len, ESP_COMPAT_HTTP_MAX_RESPONSE, &resp);
+        int r = http_request_named(c->method == HTTP_METHOD_POST ? "POST" : "GET", c->url,
+                                   c->common_name[0] ? c->common_name : NULL, c->timeout_ms,
+                                   headers, c->post, (size_t)c->post_len, ESP_COMPAT_HTTP_MAX_RESPONSE, &resp);
         free(headers);
         if (r != 0) {
             dispatch(c, HTTP_EVENT_ERROR, NULL, 0);

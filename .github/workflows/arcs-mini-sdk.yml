@@ -1,0 +1,15 @@
+name: ARCS Mini SDK host checks
+on:
+  pull_request:
+    paths: ['arcs/**', 'esp32/main/noise_control.cpp', 'esp32/components/impo_cloud_route/**', 'esp32/tests/*cloud_route*', '.github/workflows/arcs-mini-sdk.yml']
+  push:
+    branches: [main, codex/arcs-mini-reusable-sdk]
+    paths: ['arcs/**', 'esp32/main/noise_control.cpp', 'esp32/components/impo_cloud_route/**', 'esp32/tests/*cloud_route*', '.github/workflows/arcs-mini-sdk.yml']
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh arcs/tests/host/run_arcs_mini_sdk.sh

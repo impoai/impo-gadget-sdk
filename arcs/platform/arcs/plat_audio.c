@@ -5,6 +5,8 @@
  * Settings from mtt1.0-impo V2.1 (app_wakeup.c start_playback, prj.conf gains).
  */
 #include <errno.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
 
 #include "lisa_audio.h"
 #include "lisa_device.h"
@@ -22,6 +24,7 @@
 #define MIC_DIGITAL_DB   0
 
 static lisa_device_t *s_dev;
+static SemaphoreHandle_t s_mic_lock;
 
 int plat_audio_start(void)
 {
@@ -51,17 +54,20 @@ int plat_audio_start(void)
         LISA_LOGE(TAG, "play start failed: %d", r);
         return r;
     }
+    s_mic_lock = xSemaphoreCreateMutex();
+    if (!s_mic_lock) return -ENOMEM;
     s_dev = dev;
     LISA_LOGI(TAG, "speaker stream up: 16 kHz mono");
     return 0;
 }
 
-static plat_audio_mic_cb_t s_mic_cb;
+static plat_audio_mic_cb_t volatile s_mic_cb, s_wake_cb;
+static bool s_recording, s_record_stereo;
 
 static void on_audio(const lisa_audio_event_t *ev, void *user)
 {
     (void)user;
-    plat_audio_mic_cb_t cb = s_mic_cb;
+    plat_audio_mic_cb_t cb = s_mic_cb ? s_mic_cb : s_wake_cb;
     if (cb != NULL && ev->record_buffer != NULL && ev->record_samples > 0) {
         cb((const int16_t *)ev->record_buffer, ev->record_samples);
     }
@@ -74,7 +80,7 @@ void plat_audio_mic_stereo(bool on)
     s_mic_stereo = on;
 }
 
-int plat_audio_mic_start(plat_audio_mic_cb_t cb)
+static int record_start(void)
 {
     if (s_dev == NULL) {
         return -ENODEV;
@@ -96,25 +102,61 @@ int plat_audio_mic_start(plat_audio_mic_cb_t cb)
         }
         registered = true;
     }
-    s_mic_cb = cb;
     int r = lisa_audio_record_config(s_dev, &cfg);
     if (r == LISA_DEVICE_OK) {
         r = lisa_audio_record_start(s_dev);
     }
     if (r != LISA_DEVICE_OK) {
-        s_mic_cb = NULL;
         LISA_LOGE(TAG, "mic start failed: %d", r);
         return -EIO;
     }
+    s_recording = true;
+    s_record_stereo = s_mic_stereo;
     return 0;
 }
 
+int plat_audio_mic_start(plat_audio_mic_cb_t cb)
+{
+    if (!s_dev || !s_mic_lock || !cb) return -ENODEV;
+    xSemaphoreTake(s_mic_lock, portMAX_DELAY);
+    int r = s_mic_cb || (s_recording && s_record_stereo != s_mic_stereo) ? -EBUSY : 0;
+    if (!r && !s_recording) r = record_start();
+    if (!r) s_mic_cb = cb;
+    xSemaphoreGive(s_mic_lock);
+    return r;
+}
+static void stop_unused(void)
+{
+    if (s_recording && !s_mic_cb && !s_wake_cb) {
+        lisa_audio_record_stop(s_dev);
+        s_recording = false;
+    }
+}
 void plat_audio_mic_stop(void)
 {
-    if (s_dev != NULL) {
-        lisa_audio_record_stop(s_dev);
-    }
+    if (!s_mic_lock) return;
+    xSemaphoreTake(s_mic_lock, portMAX_DELAY);
     s_mic_cb = NULL;
+    stop_unused();
+    xSemaphoreGive(s_mic_lock);
+}
+int plat_audio_wake_start(plat_audio_mic_cb_t cb)
+{
+    if (!s_dev || !s_mic_lock || !cb) return -ENODEV;
+    xSemaphoreTake(s_mic_lock, portMAX_DELAY);
+    int r = s_wake_cb || s_mic_stereo || (s_recording && s_record_stereo) ? -EBUSY : 0;
+    if (!r && !s_recording) r = record_start();
+    if (!r) s_wake_cb = cb;
+    xSemaphoreGive(s_mic_lock);
+    return r;
+}
+void plat_audio_wake_stop(void)
+{
+    if (!s_mic_lock) return;
+    xSemaphoreTake(s_mic_lock, portMAX_DELAY);
+    s_wake_cb = NULL;
+    stop_unused();
+    xSemaphoreGive(s_mic_lock);
 }
 
 int plat_audio_write(const int16_t *pcm, size_t samples)

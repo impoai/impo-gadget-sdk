@@ -30,6 +30,7 @@ typedef struct esp_tls esp_tls_t;
 
 typedef struct {
     esp_err_t (*crt_bundle_attach)(void *conf);   /* accepted; plat_tls always verifies */
+    const char *common_name;                     /* SNI and verified certificate identity; NULL = peer */
     int timeout_ms;                               /* TCP connect and TLS handshake */
 } esp_tls_cfg_t;
 

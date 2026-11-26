@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "synthetic-host-test-only",
+  "label": "Hello Mini",
+  "keywords": [
+    "hello mini"
+  ],
+  "model": {
+    "file": "test-model.bin",
+    "sha256": "b0fad0f03cd9a6f95b98388e99deb91ad49e6b19af0d15986597026361755496"
+  },
+  "wrap": {
+    "file": "test-wrap.json",
+    "sha256": "979c4ce585ad737b27723218981060ce8dc9c7a8b97d5bbdc19c7ae732d5fa1a"
+  }
+}

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+config BOARD_NAME
+    string
+    default "arcs_mini_voice"
+config BOARD_ARCS_MINI
+    bool
+    default y
+    select SOC_LS2684
+config BOARD_ARCS_MINI_VOICE
+    bool
+    default y
+    select LISA_DEVICE
+    select LISA_GPIO_DEVICE
+    select LISA_GPIOA
+    select LISA_GPIOB
+config BOARD_ARCS_MINI_MODEM_UART2_REMAP
+    bool
+    default n

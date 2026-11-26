@@ -13,6 +13,7 @@ listenai_library_sources(
     ${UPSTREAM_MAIN}/noise_control.cpp
     ${UPSTREAM_MAIN}/stack_monitor.c
     ${UPSTREAM_MAIN}/vm_api.c
+    ${SDK_ROOT}/esp32/components/impo_cloud_route/impo_cloud_route.c
 )
 
 # Compat headers first; then esp32/main (gadget_attest.h, ota.h, led_status.h...) and

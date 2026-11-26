@@ -29,6 +29,11 @@ int http_parse_url(const char *url, http_url_t *out);
 int http_request(const char *method, const char *url, const char *extra_headers,
                  const void *body, size_t body_len, size_t max_response, http_response_t *resp);
 
+/* tls_name controls SNI/certificate validation independently of the URL peer. */
+int http_request_named(const char *method, const char *url, const char *tls_name, uint32_t timeout_ms,
+                       const char *extra_headers, const void *body, size_t body_len,
+                       size_t max_response, http_response_t *resp);
+
 void http_response_free(http_response_t *resp);
 
 #ifdef __cplusplus

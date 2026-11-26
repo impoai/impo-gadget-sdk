@@ -63,7 +63,8 @@ typedef esp_err_t (*http_event_handle_cb)(esp_http_client_event_t *evt);
 typedef struct {
     const char *url;
     esp_http_client_method_t method;
-    int timeout_ms;          /* accepted; plat_tls reads time out after 10 s */
+    const char *common_name; /* SNI and verified certificate identity; NULL = URL host */
+    int timeout_ms;          /* connect/handshake and response read timeout */
     int buffer_size;         /* accepted */
     int buffer_size_tx;      /* accepted */
     http_event_handle_cb event_handler;
